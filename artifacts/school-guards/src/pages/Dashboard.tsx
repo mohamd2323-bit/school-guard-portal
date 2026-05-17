@@ -72,13 +72,15 @@ function ChartCard({ title, children, empty }: {
   title: string; children: React.ReactNode; empty?: boolean;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+    <div className="bg-white rounded-2xl border border-border shadow-sm p-5 overflow-hidden">
       <h3 className="text-sm font-bold text-foreground mb-4 border-r-4 border-primary pr-3">{title}</h3>
       {empty ? (
         <div className="h-40 flex items-center justify-center">
           <p className="text-muted-foreground text-sm">لا توجد بيانات حالياً</p>
         </div>
-      ) : children}
+      ) : (
+        <div className="overflow-hidden">{children}</div>
+      )}
     </div>
   );
 }
@@ -139,25 +141,27 @@ function HBarChart({ data, color = "#0f766e", maxBars = 12 }: {
   const height = Math.max(sliced.length * barH + 20, 80);
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={sliced} layout="vertical" margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
-        <XAxis type="number" tick={{ fontSize: 11, fill: "#888" }} allowDecimals={false} />
-        <YAxis
-          type="category"
-          dataKey="name"
-          width={120}
-          tick={{ fontSize: 11, fill: "#333", fontFamily: "Cairo, sans-serif" }}
-          orientation="right"
-        />
-        <Tooltip content={<CustomTooltip />} />
-        <Bar dataKey="value" radius={[0, 6, 6, 0]} maxBarSize={22}>
-          {sliced.map((_, i) => (
-            <Cell key={i} fill={TEAL_SHADES[i % TEAL_SHADES.length]} />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <div style={{ height }} className="w-full overflow-hidden">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={sliced} layout="vertical" margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
+          <XAxis type="number" tick={{ fontSize: 11, fill: "#888" }} allowDecimals={false} />
+          <YAxis
+            type="category"
+            dataKey="name"
+            width={120}
+            tick={{ fontSize: 11, fill: "#333", fontFamily: "Cairo, sans-serif" }}
+            orientation="right"
+          />
+          <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f0faf9" }} />
+          <Bar dataKey="value" fill={color} radius={[0, 6, 6, 0]} maxBarSize={22}>
+            {sliced.map((_, i) => (
+              <Cell key={i} fill={TEAL_SHADES[i % TEAL_SHADES.length]} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
 
@@ -173,32 +177,34 @@ function DonutChart({ data, colorMap }: {
   }));
 
   return (
-    <ResponsiveContainer width="100%" height={220}>
-      <PieChart>
-        <Pie
-          data={colored}
-          cx="50%"
-          cy="50%"
-          innerRadius={55}
-          outerRadius={85}
-          dataKey="value"
-          nameKey="name"
-          paddingAngle={3}
-        >
-          {colored.map((entry, i) => (
-            <Cell key={i} fill={entry.fill} />
-          ))}
-        </Pie>
-        <Tooltip content={<PieTooltip />} />
-        <Legend
-          iconType="circle"
-          iconSize={9}
-          formatter={(value) => (
-            <span style={{ fontSize: 12, color: "#333", fontFamily: "Cairo, sans-serif" }}>{value}</span>
-          )}
-        />
-      </PieChart>
-    </ResponsiveContainer>
+    <div className="w-full overflow-hidden" style={{ height: 220 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie
+            data={colored}
+            cx="50%"
+            cy="50%"
+            innerRadius={55}
+            outerRadius={85}
+            dataKey="value"
+            nameKey="name"
+            paddingAngle={3}
+          >
+            {colored.map((entry, i) => (
+              <Cell key={i} fill={entry.fill} />
+            ))}
+          </Pie>
+          <Tooltip content={<PieTooltip />} />
+          <Legend
+            iconType="circle"
+            iconSize={9}
+            formatter={(value) => (
+              <span style={{ fontSize: 12, color: "#333", fontFamily: "Cairo, sans-serif" }}>{value}</span>
+            )}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
 
@@ -301,7 +307,7 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-10">
       {/* Page title */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
