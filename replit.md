@@ -1,44 +1,51 @@
-# [Project name]
+# بوابة الحراسات المدرسية
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+نظام إدارة الحراس المدرسيين — يتيح استيراد بيانات الحراس والمدارس من Excel وعرضها وإدارتها.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/school-guards run dev` — run the frontend (port assigned by workflow)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- Frontend: React + Vite + Tailwind CSS v4
+- Arabic RTL, Cairo font
+- State: localStorage (no backend required)
+- Excel import: xlsx library
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/school-guards/src/App.tsx` — main router (wouter)
+- `artifacts/school-guards/src/pages/` — Dashboard, Guards, Schools, DataManagement
+- `artifacts/school-guards/src/components/Layout.tsx` — sidebar + top bar
+- `artifacts/school-guards/src/components/GuardProfile.tsx` — guard profile modal
+- `artifacts/school-guards/src/store/useStore.ts` — shared localStorage state
+- `artifacts/school-guards/src/types/index.ts` — Guard and School types
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Pure frontend app — all data stored in localStorage, no database or API needed
+- Excel import uses the `xlsx` library; reads Schools sheet first, then Guards sheet
+- Guards linked to schools: first by principal national ID, then by principal name, then by school name
+- Shared global state via a simple listener pattern (no Redux/Zustand) to avoid heavy deps
+- RTL enforced at the `<html dir="rtl">` level and in body CSS
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- **لوحة التحكم**: إجمالي الحراس، المدارس، الحراس الذكور، الحارسات الإناث، مدارس بدون حارس
+- **إدارة الحراس**: جدول مع بحث، زر ملف لكل حارس
+- **إدارة المدارس**: جدول مع بحث
+- **إدارة البيانات**: استيراد Excel (ورقتان: Guards + Schools)، ملخص الاستيراد، حذف البيانات
+- **ملف الحارس**: بيانات الحارس + المدرسة + المدير/ة في modal
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
-
-## Gotchas
-
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- لا بيانات تجريبية نهائياً — "لا توجد بيانات حالياً" عند الفراغ
+- عربي RTL
+- ألوان حكومية: تيل وأبيض
 
 ## Pointers
 
