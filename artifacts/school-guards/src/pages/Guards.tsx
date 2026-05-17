@@ -1,49 +1,274 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useStore } from "../store/useStore";
 import GuardProfile from "../components/GuardProfile";
 import type { Guard } from "../types";
-import { Search, FileText, Users } from "lucide-react";
+import { Search, FileText, Users, SlidersHorizontal, X } from "lucide-react";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function unique(values: (string | undefined | null)[]): string[] {
+  return Array.from(new Set(values.filter(Boolean) as string[])).sort((a, b) =>
+    a.localeCompare(b, "ar")
+  );
+}
+
+interface FilterState {
+  governorate: string;
+  schoolName: string;
+  gender: string;
+  jobTitle: string;
+  rank: string;
+  jobType: string;
+  status: string;
+}
+
+const EMPTY_FILTERS: FilterState = {
+  governorate: "",
+  schoolName: "",
+  gender: "",
+  jobTitle: "",
+  rank: "",
+  jobType: "",
+  status: "",
+};
+
+function hasActiveFilters(f: FilterState) {
+  return Object.values(f).some((v) => v !== "");
+}
+
+// ─── Single select dropdown ───────────────────────────────────────────────────
+
+function FilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+}) {
+  const active = value !== "";
+  return (
+    <div className="flex flex-col gap-1 min-w-0">
+      <label className="text-xs font-semibold text-muted-foreground">{label}</label>
+      <div className="relative">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={`w-full appearance-none pl-7 pr-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white transition-colors
+            ${active ? "border-primary text-primary font-semibold" : "border-border text-foreground"}`}
+        >
+          <option value="">الكل</option>
+          {options.map((o) => (
+            <option key={o} value={o}>{o}</option>
+          ))}
+        </select>
+        {active && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="absolute left-2 top-1/2 -translate-y-1/2 text-primary hover:text-primary/70"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+        {!active && (
+          <div className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none">
+            <svg className="w-3.5 h-3.5 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Guards() {
   const { guards, schools } = useStore();
   const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(true);
   const [selectedGuard, setSelectedGuard] = useState<Guard | null>(null);
 
-  const filtered = guards.filter(
-    (g) =>
-      g.name.includes(search) ||
-      g.nationalId.includes(search) ||
-      g.phone.includes(search) ||
-      (g.schoolName || "").includes(search) ||
-      (g.jobType || "").includes(search) ||
-      (g.rank || "").includes(search)
-  );
+  // Derive unique option lists from real data
+  const options = useMemo(() => ({
+    governorate: unique(guards.map((g) => g.governorate)),
+    schoolName: unique(guards.map((g) => g.schoolName)),
+    gender: unique(guards.map((g) => g.gender)),
+    jobTitle: unique(guards.map((g) => g.jobTitle)),
+    rank: unique(guards.map((g) => g.rank)),
+    jobType: unique(guards.map((g) => g.jobType)),
+    status: unique(guards.map((g) => g.status)),
+  }), [guards]);
+
+  const setFilter = (key: keyof FilterState, value: string) =>
+    setFilters((prev) => ({ ...prev, [key]: value }));
+
+  const clearFilters = () => setFilters(EMPTY_FILTERS);
+
+  const activeCount = Object.values(filters).filter((v) => v !== "").length;
+
+  const filtered = useMemo(() => {
+    return guards.filter((g) => {
+      // Search box
+      const q = search.trim();
+      const matchSearch =
+        !q ||
+        g.name.includes(q) ||
+        g.nationalId.includes(q) ||
+        g.phone.includes(q) ||
+        (g.schoolName || "").includes(q) ||
+        (g.jobType || "").includes(q) ||
+        (g.rank || "").includes(q);
+
+      // Dropdown filters
+      const matchGovernorate = !filters.governorate || g.governorate === filters.governorate;
+      const matchSchool = !filters.schoolName || g.schoolName === filters.schoolName;
+      const matchGender = !filters.gender || g.gender === filters.gender;
+      const matchJobTitle = !filters.jobTitle || g.jobTitle === filters.jobTitle;
+      const matchRank = !filters.rank || g.rank === filters.rank;
+      const matchJobType = !filters.jobType || g.jobType === filters.jobType;
+      const matchStatus = !filters.status || g.status === filters.status;
+
+      return (
+        matchSearch &&
+        matchGovernorate &&
+        matchSchool &&
+        matchGender &&
+        matchJobTitle &&
+        matchRank &&
+        matchJobType &&
+        matchStatus
+      );
+    });
+  }, [guards, search, filters]);
 
   const selectedSchool = selectedGuard
     ? schools.find((s) => s.id === selectedGuard.schoolId) || null
     : null;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
+      {/* ── Header row ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-xl font-bold text-foreground">إدارة الحراس</h2>
           <p className="text-muted-foreground text-sm mt-0.5">
             إجمالي: {guards.length.toLocaleString("ar-SA")} حارس
+            {(search || hasActiveFilters(filters)) && filtered.length !== guards.length && (
+              <span className="mr-2 text-primary font-semibold">
+                — يُعرض {filtered.length.toLocaleString("ar-SA")}
+              </span>
+            )}
           </p>
         </div>
-        <div className="relative">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="بحث..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pr-9 pl-4 py-2 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 w-56"
-          />
+        <div className="flex items-center gap-2">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="بحث..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pr-9 pl-4 py-2 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 w-52"
+            />
+          </div>
+          {/* Toggle filters panel */}
+          {guards.length > 0 && (
+            <button
+              onClick={() => setFiltersOpen((o) => !o)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-semibold transition-colors
+                ${filtersOpen || activeCount > 0
+                  ? "border-primary bg-primary/5 text-primary"
+                  : "border-border bg-white text-foreground hover:border-primary/40"}`}
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              فلاتر
+              {activeCount > 0 && (
+                <span className="bg-primary text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                  {activeCount}
+                </span>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
+      {/* ── Filter panel ───────────────────────────────────────────────────── */}
+      {guards.length > 0 && filtersOpen && (
+        <div className="bg-white border border-border rounded-xl shadow-sm p-4 space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+            <FilterSelect
+              label="المحافظة"
+              value={filters.governorate}
+              options={options.governorate}
+              onChange={(v) => setFilter("governorate", v)}
+            />
+            <FilterSelect
+              label="المدرسة"
+              value={filters.schoolName}
+              options={options.schoolName}
+              onChange={(v) => setFilter("schoolName", v)}
+            />
+            <FilterSelect
+              label="الجنس"
+              value={filters.gender}
+              options={options.gender.length ? options.gender : ["ذكر", "أنثى"]}
+              onChange={(v) => setFilter("gender", v)}
+            />
+            <FilterSelect
+              label="المسمى الوظيفي"
+              value={filters.jobTitle}
+              options={options.jobTitle}
+              onChange={(v) => setFilter("jobTitle", v)}
+            />
+            <FilterSelect
+              label="المرتبة"
+              value={filters.rank}
+              options={options.rank}
+              onChange={(v) => setFilter("rank", v)}
+            />
+            <FilterSelect
+              label="نوع الوظيفة"
+              value={filters.jobType}
+              options={options.jobType}
+              onChange={(v) => setFilter("jobType", v)}
+            />
+            <FilterSelect
+              label="الحالة"
+              value={filters.status}
+              options={options.status.length ? options.status : ["نشط", "غير نشط"]}
+              onChange={(v) => setFilter("status", v)}
+            />
+          </div>
+
+          {/* Clear button */}
+          {hasActiveFilters(filters) && (
+            <div className="flex items-center justify-between pt-1 border-t border-border">
+              <p className="text-xs text-muted-foreground">
+                {activeCount} {activeCount === 1 ? "فلتر نشط" : "فلاتر نشطة"} — يُعرض{" "}
+                <span className="font-semibold text-primary">{filtered.length.toLocaleString("ar-SA")}</span>{" "}
+                من أصل {guards.length.toLocaleString("ar-SA")} حارس
+              </p>
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-1.5 text-sm text-red-600 hover:text-red-700 font-semibold transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+                مسح الفلاتر
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Table (unchanged) ──────────────────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
         {guards.length === 0 ? (
           <div className="py-20 text-center">
@@ -59,8 +284,14 @@ export default function Guards() {
             </p>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-16 text-center text-muted-foreground text-sm">
-            لا توجد نتائج مطابقة للبحث
+          <div className="py-16 text-center">
+            <p className="text-muted-foreground text-sm">لا توجد نتائج مطابقة</p>
+            {hasActiveFilters(filters) && (
+              <button onClick={clearFilters}
+                className="mt-2 text-sm text-primary hover:underline font-medium">
+                مسح الفلاتر
+              </button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
