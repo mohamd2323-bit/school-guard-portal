@@ -5,6 +5,7 @@ import {
   School,
   Database,
   ClipboardList,
+  Headphones,
   Menu,
   X,
 } from "lucide-react";
@@ -15,6 +16,7 @@ const navItems = [
   { href: "/guards", label: "إدارة الحراس", icon: ShieldCheck },
   { href: "/schools", label: "إدارة المدارس", icon: School },
   { href: "/needs", label: "الاحتياج", icon: ClipboardList },
+  { href: "/tickets", label: "بلاغات الدعم الموحد", icon: Headphones },
   { href: "/data", label: "إدارة البيانات", icon: Database },
 ];
 
@@ -68,7 +70,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 onClick={() => setMobileOpen(false)}
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
-                <span>{item.label}</span>
+                <span className="leading-tight">{item.label}</span>
               </Link>
             );
           })}

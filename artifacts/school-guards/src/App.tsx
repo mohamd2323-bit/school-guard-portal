@@ -5,6 +5,7 @@ import Guards from "./pages/Guards";
 import Schools from "./pages/Schools";
 import DataManagement from "./pages/DataManagement";
 import Needs from "./pages/Needs";
+import Tickets from "./pages/Tickets";
 
 function NotFound() {
   return (
@@ -22,6 +23,7 @@ function Router() {
         <Route path="/guards" component={Guards} />
         <Route path="/schools" component={Schools} />
         <Route path="/needs" component={Needs} />
+        <Route path="/tickets" component={Tickets} />
         <Route path="/data" component={DataManagement} />
         <Route component={NotFound} />
       </Switch>

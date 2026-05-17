@@ -46,6 +46,31 @@ export interface Need {
   createdAt: string;
 }
 
+export type TicketStatus = "جديد" | "تحت الإجراء" | "مغلق";
+export type TicketType =
+  | "شكوى"
+  | "طلب صيانة"
+  | "طلب دعم فني"
+  | "بلاغ حادثة"
+  | "متابعة"
+  | "أخرى";
+
+export interface Ticket {
+  id: string;
+  ticketNumber: string;
+  schoolId: string | null;
+  schoolName: string;
+  governorate: string;
+  principalName: string;
+  principalPhone: string;
+  ticketType: TicketType;
+  description: string;
+  status: TicketStatus;
+  ticketDate: string;
+  actions: string;
+  createdAt: string;
+}
+
 export interface ImportSummary {
   guardsImported: number;
   schoolsImported: number;
@@ -58,4 +83,5 @@ export interface AppData {
   guards: Guard[];
   schools: School[];
   needs: Need[];
+  tickets: Ticket[];
 }

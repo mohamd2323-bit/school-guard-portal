@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import type { Guard, School, Need, NeedStatus, AppData } from "../types";
+import type { Guard, School, Need, NeedStatus, Ticket, TicketStatus, AppData } from "../types";
 import { demoGuards, demoSchools } from "../data/demoData";
 
 const STORAGE_KEY = "school_guards_data";
@@ -7,15 +7,16 @@ const STORAGE_KEY = "school_guards_data";
 function loadFromStorage(): AppData {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { guards: [], schools: [], needs: [] };
+    if (!raw) return { guards: [], schools: [], needs: [], tickets: [] };
     const parsed = JSON.parse(raw) as Partial<AppData>;
     return {
       guards: parsed.guards ?? [],
       schools: parsed.schools ?? [],
       needs: parsed.needs ?? [],
+      tickets: parsed.tickets ?? [],
     };
   } catch {
-    return { guards: [], schools: [], needs: [] };
+    return { guards: [], schools: [], needs: [], tickets: [] };
   }
 }
 
@@ -49,12 +50,11 @@ export function useStore() {
 
   const importData = useCallback(
     (guards: Guard[], schools: School[]) => {
-      const demoGuardItems = sharedData.guards.filter((g) => g.isDemo);
-      const demoSchoolItems = sharedData.schools.filter((s) => s.isDemo);
       setData({
-        guards: [...demoGuardItems, ...guards],
-        schools: [...demoSchoolItems, ...schools],
+        guards: [...sharedData.guards.filter((g) => g.isDemo), ...guards],
+        schools: [...sharedData.schools.filter((s) => s.isDemo), ...schools],
         needs: sharedData.needs,
+        tickets: sharedData.tickets,
       });
     },
     [setData]
@@ -65,6 +65,7 @@ export function useStore() {
       guards: sharedData.guards.filter((g) => g.isDemo),
       schools: sharedData.schools.filter((s) => s.isDemo),
       needs: sharedData.needs,
+      tickets: sharedData.tickets,
     });
   }, [setData]);
 
@@ -73,6 +74,7 @@ export function useStore() {
       guards: [...demoGuards, ...sharedData.guards.filter((g) => !g.isDemo)],
       schools: [...demoSchools, ...sharedData.schools.filter((s) => !s.isDemo)],
       needs: sharedData.needs,
+      tickets: sharedData.tickets,
     });
   }, [setData]);
 
@@ -81,45 +83,54 @@ export function useStore() {
       guards: sharedData.guards.filter((g) => !g.isDemo),
       schools: sharedData.schools.filter((s) => !s.isDemo),
       needs: sharedData.needs,
+      tickets: sharedData.tickets,
     });
   }, [setData]);
 
+  // ── Needs ────────────────────────────────────────────────────────────────
   const addNeed = useCallback(
-    (need: Need) => {
-      setData({ ...sharedData, needs: [need, ...sharedData.needs] });
-    },
+    (need: Need) => setData({ ...sharedData, needs: [need, ...sharedData.needs] }),
     [setData]
   );
 
   const updateNeedStatus = useCallback(
-    (id: string, status: NeedStatus) => {
-      setData({
-        ...sharedData,
-        needs: sharedData.needs.map((n) => (n.id === id ? { ...n, status } : n)),
-      });
-    },
+    (id: string, status: NeedStatus) =>
+      setData({ ...sharedData, needs: sharedData.needs.map((n) => (n.id === id ? { ...n, status } : n)) }),
     [setData]
   );
 
   const deleteNeed = useCallback(
-    (id: string) => {
-      setData({ ...sharedData, needs: sharedData.needs.filter((n) => n.id !== id) });
-    },
+    (id: string) => setData({ ...sharedData, needs: sharedData.needs.filter((n) => n.id !== id) }),
+    [setData]
+  );
+
+  // ── Tickets ──────────────────────────────────────────────────────────────
+  const addTicket = useCallback(
+    (ticket: Ticket) => setData({ ...sharedData, tickets: [ticket, ...sharedData.tickets] }),
+    [setData]
+  );
+
+  const updateTicket = useCallback(
+    (id: string, patch: Partial<Ticket>) =>
+      setData({ ...sharedData, tickets: sharedData.tickets.map((t) => (t.id === id ? { ...t, ...patch } : t)) }),
+    [setData]
+  );
+
+  const deleteTicket = useCallback(
+    (id: string) => setData({ ...sharedData, tickets: sharedData.tickets.filter((t) => t.id !== id) }),
     [setData]
   );
 
   const hasDemoData =
-    sharedData.guards.some((g) => g.isDemo) ||
-    sharedData.schools.some((s) => s.isDemo);
-
+    sharedData.guards.some((g) => g.isDemo) || sharedData.schools.some((s) => s.isDemo);
   const hasRealData =
-    sharedData.guards.some((g) => !g.isDemo) ||
-    sharedData.schools.some((s) => !s.isDemo);
+    sharedData.guards.some((g) => !g.isDemo) || sharedData.schools.some((s) => !s.isDemo);
 
   return {
     guards: sharedData.guards,
     schools: sharedData.schools,
     needs: sharedData.needs,
+    tickets: sharedData.tickets,
     importData,
     clearData,
     loadDemoData,
@@ -127,6 +138,9 @@ export function useStore() {
     addNeed,
     updateNeedStatus,
     deleteNeed,
+    addTicket,
+    updateTicket,
+    deleteTicket,
     hasDemoData,
     hasRealData,
     hasData: sharedData.guards.length > 0 || sharedData.schools.length > 0,
