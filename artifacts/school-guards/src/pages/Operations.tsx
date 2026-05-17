@@ -559,6 +559,29 @@ function buildLetterHTML(l: LetterData): string {
     ? `وحتى تاريخ ${formatDateAr(l.endDate)}`
     : "حتى إشعار آخر";
 
+  /* Saudi Ministry of Education emblem — simplified SVG in teal */
+  const emblemSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="90" height="90">
+    <!-- Palm tree trunk -->
+    <rect x="56" y="55" width="8" height="38" rx="3" fill="#1a7a6e"/>
+    <!-- Palm fronds -->
+    <ellipse cx="60" cy="38" rx="5" ry="18" fill="#1a7a6e" transform="rotate(-35 60 55)"/>
+    <ellipse cx="60" cy="38" rx="5" ry="18" fill="#1a7a6e" transform="rotate(35 60 55)"/>
+    <ellipse cx="60" cy="34" rx="4" ry="20" fill="#1a7a6e" transform="rotate(-65 60 55)"/>
+    <ellipse cx="60" cy="34" rx="4" ry="20" fill="#1a7a6e" transform="rotate(65 60 55)"/>
+    <ellipse cx="60" cy="32" rx="3" ry="16" fill="#1a7a6e" transform="rotate(-90 60 55)"/>
+    <ellipse cx="60" cy="32" rx="3" ry="16" fill="#1a7a6e" transform="rotate(90 60 55)"/>
+    <!-- Left sword -->
+    <line x1="15" y1="90" x2="50" y2="55" stroke="#1a7a6e" stroke-width="4" stroke-linecap="round"/>
+    <polygon points="10,95 15,90 20,98" fill="#1a7a6e"/>
+    <rect x="10" y="86" width="14" height="4" rx="2" fill="#c8a84b" transform="rotate(-45 17 88)"/>
+    <!-- Right sword -->
+    <line x1="105" y1="90" x2="70" y2="55" stroke="#1a7a6e" stroke-width="4" stroke-linecap="round"/>
+    <polygon points="110,95 105,90 100,98" fill="#1a7a6e"/>
+    <rect x="96" y="86" width="14" height="4" rx="2" fill="#c8a84b" transform="rotate(45 103 88)"/>
+    <!-- Base ground line -->
+    <line x1="20" y1="94" x2="100" y2="94" stroke="#1a7a6e" stroke-width="2.5" stroke-linecap="round"/>
+  </svg>`;
+
   return `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
@@ -566,182 +589,384 @@ function buildLetterHTML(l: LetterData): string {
   <title>خطاب تكليف — ${l.guardName}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    @page { size: A4; margin: 2cm 2.5cm; }
+
+    @page {
+      size: A4;
+      margin: 2cm 2.5cm 2.5cm 2.5cm;
+    }
+
     body {
-      font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
-      font-size: 14px;
+      font-family: 'Segoe UI', 'Tahoma', 'Arial', sans-serif;
+      font-size: 13.5px;
       color: #1a1a1a;
       direction: rtl;
-      line-height: 1.9;
+      line-height: 1.85;
       background: #fff;
     }
-    .page { max-width: 720px; margin: 0 auto; padding: 40px; }
-    .letterhead {
-      text-align: center;
-      border-bottom: 3px double #1a7a6e;
-      padding-bottom: 18px;
-      margin-bottom: 28px;
+
+    .page {
+      max-width: 750px;
+      margin: 0 auto;
+      padding: 32px 40px 40px;
     }
-    .kingdom { font-size: 13px; color: #444; letter-spacing: 1px; }
-    .ministry { font-size: 18px; font-weight: bold; color: #1a7a6e; margin: 6px 0 2px; }
-    .dept { font-size: 13px; color: #666; }
-    .meta {
+
+    /* ── Official Header ── */
+    .letterhead {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 14px;
+      margin-bottom: 0;
+      border-bottom: 4px double #1a7a6e;
+    }
+
+    /* Right block: logo + identity */
+    .identity-block {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex: 1;
+    }
+
+    .emblem-wrapper {
+      flex-shrink: 0;
+      width: 90px;
+      height: 90px;
+    }
+
+    .identity-text {
+      text-align: right;
+    }
+
+    .id-kingdom {
+      font-size: 11.5px;
+      color: #555;
+      letter-spacing: 0.5px;
+      margin-bottom: 3px;
+    }
+
+    .id-ministry {
+      font-size: 17px;
+      font-weight: 900;
+      color: #1a7a6e;
+      margin-bottom: 2px;
+      letter-spacing: 0.3px;
+    }
+
+    .id-dept {
+      font-size: 12px;
+      color: #444;
+      font-weight: 600;
+      margin-bottom: 1px;
+    }
+
+    .id-sub {
+      font-size: 11.5px;
+      color: #666;
+    }
+
+    /* Left block: Bismillah / decorative */
+    .header-left {
+      text-align: center;
+      flex-shrink: 0;
+      width: 120px;
+    }
+
+    .bismillah {
+      font-size: 15px;
+      color: #1a7a6e;
+      font-weight: bold;
+      line-height: 1.6;
+    }
+
+    .header-sub-line {
+      font-size: 10px;
+      color: #aaa;
+      margin-top: 4px;
+    }
+
+    /* ── Reference bar ── */
+    .meta-bar {
       display: flex;
       justify-content: space-between;
+      align-items: center;
+      background: #f4faf9;
+      border: 1px solid #c8e6e0;
+      border-radius: 6px;
+      padding: 9px 16px;
+      margin: 18px 0;
       font-size: 12px;
-      color: #555;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      padding: 10px 16px;
-      margin-bottom: 24px;
-      background: #f9f9f9;
+      color: #444;
     }
-    .meta span { font-weight: 600; color: #1a7a6e; }
+
+    .meta-bar .meta-item { display: flex; align-items: center; gap: 6px; }
+    .meta-bar .meta-label { color: #777; }
+    .meta-bar .meta-value { font-weight: 700; color: #1a7a6e; font-size: 13px; }
+
+    /* ── Recipient block ── */
     .recipient {
-      border-right: 4px solid #1a7a6e;
-      padding-right: 14px;
-      margin-bottom: 22px;
-      background: #f5fdfb;
+      border: 1px solid #d0ece7;
+      border-right: 5px solid #1a7a6e;
       border-radius: 0 8px 8px 0;
-      padding: 12px 16px 12px 12px;
+      background: #f7fdfc;
+      padding: 13px 18px 13px 14px;
+      margin-bottom: 20px;
     }
-    .recipient p { font-size: 13px; color: #555; margin: 2px 0; }
-    .recipient .name { font-size: 16px; font-weight: bold; color: #1a1a1a; }
+
+    .recipient-label {
+      font-size: 11px;
+      color: #888;
+      margin-bottom: 4px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .recipient-name {
+      font-size: 17px;
+      font-weight: 800;
+      color: #111;
+      margin-bottom: 6px;
+    }
+
+    .recipient-details {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3px 20px;
+      font-size: 12.5px;
+      color: #555;
+    }
+
+    .recipient-details strong { color: #1a1a1a; font-weight: 700; }
+
+    /* ── Subject line ── */
     .subject {
-      font-size: 15px;
-      font-weight: bold;
       text-align: center;
-      color: #1a7a6e;
-      border: 1px solid #b2dfdb;
-      border-radius: 8px;
-      padding: 8px 16px;
+      font-size: 16px;
+      font-weight: 900;
+      color: #fff;
+      background: #1a7a6e;
+      border-radius: 6px;
+      padding: 9px 20px;
       margin-bottom: 22px;
-      background: #e8f5e9;
+      letter-spacing: 0.5px;
     }
-    .salutation { margin-bottom: 16px; font-size: 14px; }
-    .body { font-size: 14px; text-align: justify; margin-bottom: 20px; line-height: 2; }
+
+    /* ── Body ── */
+    .salutation { margin-bottom: 14px; font-size: 13.5px; color: #333; }
+
+    .body-para {
+      font-size: 13.5px;
+      text-align: justify;
+      margin-bottom: 14px;
+      line-height: 2;
+      color: #222;
+    }
+
     .highlight {
-      display: inline-block;
-      font-weight: bold;
-      color: #0f5e57;
+      display: inline;
+      font-weight: 800;
+      color: #0d5c55;
       border-bottom: 2px solid #1a7a6e;
-      padding: 0 3px;
+      padding: 0 2px;
     }
+
     .reason-box {
       background: #f0fdf4;
-      border: 1px solid #bbf7d0;
-      border-radius: 8px;
-      padding: 12px 16px;
+      border: 1px solid #86efac;
+      border-right: 4px solid #16a34a;
+      border-radius: 0 6px 6px 0;
+      padding: 11px 15px;
       margin: 14px 0;
       font-size: 13px;
+      color: #14532d;
     }
-    .reason-box strong { color: #166534; }
+
+    .reason-box strong { font-weight: 700; }
+
     .notes-box {
-      background: #fefce8;
-      border: 1px solid #fde68a;
-      border-radius: 8px;
-      padding: 12px 16px;
+      background: #fffbeb;
+      border: 1px solid #fcd34d;
+      border-right: 4px solid #d97706;
+      border-radius: 0 6px 6px 0;
+      padding: 11px 15px;
       margin: 10px 0;
       font-size: 13px;
       color: #78350f;
     }
-    .closing { margin-top: 24px; font-size: 14px; }
-    .signature {
-      margin-top: 48px;
-      text-align: center;
-    }
-    .sig-title { font-size: 14px; font-weight: bold; color: #1a7a6e; }
-    .sig-dept { font-size: 13px; color: #555; margin-top: 4px; }
-    .sig-line {
-      margin: 40px auto 8px;
-      width: 200px;
-      border-bottom: 1.5px solid #1a7a6e;
-    }
-    .sig-stamp {
-      display: inline-block;
-      border: 2px dashed #1a7a6e;
-      color: #1a7a6e;
-      border-radius: 50%;
-      width: 100px;
-      height: 100px;
-      line-height: 100px;
-      text-align: center;
-      font-size: 11px;
-      margin-top: 24px;
-      opacity: 0.35;
-    }
-    .footer {
-      margin-top: 48px;
-      border-top: 1px solid #e0e0e0;
-      padding-top: 10px;
+
+    .closing { margin-top: 20px; font-size: 13.5px; color: #333; }
+
+    /* ── Signature area ── */
+    .signature-area {
       display: flex;
       justify-content: space-between;
-      font-size: 11px;
-      color: #aaa;
+      align-items: flex-start;
+      margin-top: 50px;
     }
-    @media print { body { padding: 0; } .page { padding: 0; } }
+
+    .sig-block {
+      text-align: center;
+      min-width: 200px;
+    }
+
+    .sig-title {
+      font-size: 13.5px;
+      font-weight: 800;
+      color: #1a7a6e;
+    }
+
+    .sig-dept {
+      font-size: 12px;
+      color: #555;
+      margin-top: 3px;
+    }
+
+    .sig-line {
+      margin: 38px auto 6px;
+      width: 180px;
+      border-bottom: 1.5px solid #1a7a6e;
+    }
+
+    .sig-label {
+      font-size: 11px;
+      color: #999;
+    }
+
+    .stamp-circle {
+      width: 88px;
+      height: 88px;
+      border-radius: 50%;
+      border: 2px dashed #1a7a6e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: #1a7a6e;
+      opacity: 0.3;
+      text-align: center;
+      line-height: 1.4;
+      padding: 8px;
+      margin-top: 20px;
+    }
+
+    /* ── Footer ── */
+    .letter-footer {
+      margin-top: 40px;
+      padding-top: 10px;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: space-between;
+      font-size: 10.5px;
+      color: #bbb;
+    }
+
+    /* ── Print rules ── */
+    @media print {
+      body { padding: 0 !important; }
+      .page { padding: 0 !important; max-width: 100% !important; }
+      .stamp-circle { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .subject { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .meta-bar { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
   </style>
 </head>
 <body>
 <div class="page">
+
+  <!-- ══ OFFICIAL HEADER ══ -->
   <div class="letterhead">
-    <p class="kingdom">المملكة العربية السعودية</p>
-    <p class="ministry">وزارة التعليم</p>
-    <p class="dept">إدارة الأمن والسلامة والمرافق &nbsp;|&nbsp; الأمن المدرسي — تعليم عسير</p>
+
+    <!-- RIGHT: Ministry logo + identity (RTL = appears on right) -->
+    <div class="identity-block">
+      <div class="emblem-wrapper">${emblemSVG}</div>
+      <div class="identity-text">
+        <p class="id-kingdom">المملكة العربية السعودية</p>
+        <p class="id-ministry">وزارة التعليم</p>
+        <p class="id-dept">إدارة الأمن والسلامة والمرافق</p>
+        <p class="id-sub">الأمن المدرسي &mdash; تعليم عسير</p>
+      </div>
+    </div>
+
+    <!-- LEFT: Bismillah -->
+    <div class="header-left">
+      <div class="bismillah">بسم الله<br>الرحمن الرحيم</div>
+      <div class="header-sub-line">نظام إدارة الحراسات المدرسية</div>
+    </div>
+
   </div>
 
-  <div class="meta">
-    <div>رقم الخطاب: <span>${l.refNumber}</span></div>
-    <div>التاريخ: <span>${formatDateAr(l.issueDate)}</span></div>
+  <!-- ══ REFERENCE BAR ══ -->
+  <div class="meta-bar">
+    <div class="meta-item">
+      <span class="meta-label">رقم الخطاب:</span>
+      <span class="meta-value">${l.refNumber}</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">التاريخ:</span>
+      <span class="meta-value">${formatDateAr(l.issueDate)}</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">الجهة:</span>
+      <span class="meta-value">إدارة تعليم عسير</span>
+    </div>
   </div>
 
+  <!-- ══ RECIPIENT ══ -->
   <div class="recipient">
-    <p>إلى السيد / السيدة</p>
-    <p class="name">${l.guardName}</p>
-    <p>السجل المدني: <strong>${l.nationalId}</strong></p>
-    <p>المسمى الوظيفي: <strong>${l.jobTitle || "—"}</strong></p>
-    <p>جهة العمل الحالية: <strong>${l.currentSchool}</strong></p>
+    <div class="recipient-label">المُكلَّف / المُكلَّفة</div>
+    <div class="recipient-name">${l.guardName}</div>
+    <div class="recipient-details">
+      <div>السجل المدني: <strong>${l.nationalId}</strong></div>
+      <div>المسمى الوظيفي: <strong>${l.jobTitle || "—"}</strong></div>
+      <div>جهة العمل الحالية: <strong>${l.currentSchool}</strong></div>
+    </div>
   </div>
 
-  <div class="subject">خطاب تكليف</div>
+  <!-- ══ SUBJECT ══ -->
+  <div class="subject">خطاب تكليف رسمي</div>
 
+  <!-- ══ BODY ══ -->
   <p class="salutation">السلام عليكم ورحمة الله وبركاته،</p>
 
-  <div class="body">
-    <p>
-      نفيدكم بأنه تقرر تكليفكم بالعمل في
-      <span class="highlight">${l.entityType}: ${l.entity}</span>،
-      وذلك اعتباراً من تاريخ
-      <span class="highlight">${formatDateAr(l.startDate)}</span>
-      ${endLine}.
-    </p>
+  <div class="body-para">
+    نفيدكم بأنه تقرر تكليفكم بالعمل في
+    <span class="highlight">${l.entityType}: ${l.entity}</span>،
+    وذلك اعتباراً من تاريخ
+    <span class="highlight">${formatDateAr(l.startDate)}</span>
+    ${endLine}.
   </div>
 
   ${l.reason ? `<div class="reason-box"><strong>سبب التكليف:</strong> ${l.reason}</div>` : ""}
 
-  <div class="body">
-    <p>
-      لذا يُرجى الانتقال إلى الجهة المذكورة في التاريخ المحدد،
-      والالتزام بجميع تعليمات العمل والأنظمة واللوائح المعمول بها.
-    </p>
+  <div class="body-para">
+    لذا يُرجى الانتقال إلى الجهة المذكورة في التاريخ المحدد،
+    والالتزام بجميع تعليمات العمل والأنظمة واللوائح المعمول بها.
+    وعلى الجهة المُكلَّف إليها التعاون التام وتهيئة بيئة العمل اللازمة.
   </div>
 
-  ${l.notes ? `<div class="notes-box">ملاحظات: ${l.notes}</div>` : ""}
+  ${l.notes ? `<div class="notes-box"><strong>ملاحظات:</strong> ${l.notes}</div>` : ""}
 
-  <p class="closing">وتفضلوا بقبول وافر التحية والاحترام.</p>
+  <p class="closing">وتفضلوا بقبول وافر التحية والاحترام،،،</p>
 
-  <div class="signature">
-    <div class="sig-title">مدير الأمن والسلامة والمرافق</div>
-    <div class="sig-dept">إدارة تعليم عسير</div>
-    <div class="sig-line"></div>
-    <div style="font-size:12px;color:#888;">التوقيع</div>
-    <div class="sig-stamp">الختم الرسمي</div>
+  <!-- ══ SIGNATURE ══ -->
+  <div class="signature-area">
+    <div class="sig-block">
+      <div class="sig-title">مدير الأمن والسلامة والمرافق</div>
+      <div class="sig-dept">إدارة تعليم عسير</div>
+      <div class="sig-line"></div>
+      <div class="sig-label">التوقيع والختم</div>
+      <div class="stamp-circle">الختم<br>الرسمي</div>
+    </div>
+    <div style="width:120px"></div>
   </div>
 
-  <div class="footer">
-    <span>نظام إدارة الحراسات المدرسية — تعليم عسير</span>
+  <!-- ══ FOOTER ══ -->
+  <div class="letter-footer">
+    <span>وزارة التعليم — إدارة تعليم عسير — الأمن المدرسي</span>
     <span>رقم المرجع: ${l.refNumber}</span>
   </div>
+
 </div>
 </body>
 </html>`;
