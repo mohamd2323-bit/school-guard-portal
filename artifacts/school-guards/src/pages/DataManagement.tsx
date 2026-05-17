@@ -26,10 +26,52 @@ function normalizeStr(s: unknown): string {
   return String(s).trim();
 }
 
-function pick(row: Record<string, unknown>, ...keys: string[]): string {
-  for (const k of keys) {
-    const v = normalizeStr(row[k]);
-    if (v) return v;
+/**
+ * Normalize a column name for fuzzy matching:
+ * - lowercase
+ * - strip spaces, slashes, dashes, dots, Arabic punctuation, parentheses
+ */
+function normKey(s: string): string {
+  return s.toLowerCase().replace(/[\s/\-_.،؟!()[\]]/g, "");
+}
+
+/**
+ * Build a lookup map: normKey(columnName) → original column name.
+ * Built once per row (columns are identical across all rows).
+ */
+function buildColMap(row: Record<string, unknown>): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const k of Object.keys(row)) {
+    map.set(normKey(k), k);
+  }
+  return map;
+}
+
+/**
+ * Smart pick: find a non-empty cell whose column name fuzzy-matches any keyword.
+ * Matching rules (tried in order):
+ *  1. Exact normalized match
+ *  2. Normalized column contains normalized keyword
+ *  3. Normalized keyword contains normalized column
+ */
+function pick(row: Record<string, unknown>, colMap: Map<string, string>, ...keywords: string[]): string {
+  for (const kw of keywords) {
+    const nkw = normKey(kw);
+
+    // 1. Exact
+    const exact = colMap.get(nkw);
+    if (exact !== undefined) {
+      const v = normalizeStr(row[exact]);
+      if (v) return v;
+    }
+
+    // 2 & 3. Substring match
+    for (const [nCol, origCol] of colMap) {
+      if (nCol.includes(nkw) || nkw.includes(nCol)) {
+        const v = normalizeStr(row[origCol]);
+        if (v) return v;
+      }
+    }
   }
   return "";
 }
@@ -69,15 +111,18 @@ function parseSchools(ws: XLSX.WorkSheet): { schools: School[]; errors: string[]
   const errors: string[] = [];
 
   rows.forEach((row, i) => {
-    const name = pick(row,
-      "اسم المدرسة", "المدرسة", "School Name", "school_name", "name", "الاسم",
-      "اسم المدرسه", "school", "School",
+    const cm = buildColMap(row);
+
+    // School name — look for "مدرسة" or "school" fragment
+    const name = pick(row, cm,
+      "اسم المدرسة", "المدرسة", "مدرسة", "school name", "school_name", "school",
     );
     if (!name) {
       errors.push(`مدرسة - الصف ${i + 2}: اسم المدرسة مفقود`);
       return;
     }
-    const typeRaw = pick(row, "النوع", "نوع المدرسة", "Type", "type", "جنس المدرسة");
+
+    const typeRaw = pick(row, cm, "النوع", "نوع المدرسة", "جنس المدرسة", "type");
     let type: School["type"] = "بنين";
     if (typeRaw.includes("بنات") || typeRaw.toLowerCase().includes("girl")) type = "بنات";
     else if (typeRaw.includes("مختلط") || typeRaw.toLowerCase().includes("mix")) type = "مختلط";
@@ -85,27 +130,27 @@ function parseSchools(ws: XLSX.WorkSheet): { schools: School[]; errors: string[]
     schools.push({
       id: generateId(),
       name,
-      governorate: pick(row,
-        "المحافظة", "محافظة", "Governorate", "governorate",
-        "المنطقة الفرعية", "District",
+      governorate: pick(row, cm,
+        "المحافظة", "محافظة", "governorate", "district",
       ),
-      level: pick(row,
-        "المرحلة", "المرحلة الدراسية", "Level", "level",
-        "مرحلة", "Stage",
+      level: pick(row, cm,
+        "المرحلة", "المرحلة الدراسية", "مرحلة", "level", "stage",
       ),
       type,
-      principalName: pick(row,
-        "اسم المدير", "اسم المديرة", "اسم المدير/ة", "اسم مدير المدرسة",
-        "Principal Name", "principal_name", "المدير", "المديرة",
+      // Principal name: any column containing "مدير" or "مديرة" + "اسم"
+      principalName: pick(row, cm,
+        "اسم المديرة", "اسم المدير", "المديرة", "المدير",
+        "principal name", "principal_name",
       ),
-      principalNationalId: pick(row,
-        "سجل المدير", "سجل المديرة", "سجل المدير/ة", "رقم هوية المدير",
-        "رقم هوية المديرة", "هوية المدير", "Principal ID", "principal_id",
-        "رقم الهوية",
+      // Principal ID: any column with "سجل" or "هوية" near "مدير"
+      principalNationalId: pick(row, cm,
+        "سجل المديرة", "سجل المدير", "رقم هوية المديرة", "رقم هوية المدير",
+        "هوية المدير", "هوية المديرة", "principal id", "principal_id",
       ),
-      principalPhone: pick(row,
-        "جوال المدير", "جوال المديرة", "جوال المدير/ة", "رقم جوال المدير",
-        "هاتف المدير", "Principal Phone", "principal_phone", "الجوال",
+      // Principal phone: any column with "جوال" or "هاتف" near "مدير"
+      principalPhone: pick(row, cm,
+        "جوال المديرة", "جوال المدير", "رقم جوال المديرة", "رقم جوال المدير",
+        "هاتف المدير", "هاتف المديرة", "principal phone", "principal_phone",
       ),
     });
   });
@@ -123,25 +168,28 @@ function parseGuards(
   let linkedCount = 0;
 
   rows.forEach((row, i) => {
-    const name = pick(row,
-      "اسم الحارس", "الاسم", "اسم الحارسة", "اسم الموظف", "الاسم الكامل",
-      "Guard Name", "name", "Full Name",
+    const cm = buildColMap(row);
+
+    const name = pick(row, cm,
+      "اسم الحارس", "اسم الحارسة", "اسم الموظف", "الاسم الكامل", "الاسم",
+      "guard name", "full name", "name",
     );
     if (!name) {
       errors.push(`حارس - الصف ${i + 2}: اسم الحارس مفقود`);
       return;
     }
 
-    const principalIdInRow = pick(row,
-      "سجل المدير", "سجل المديرة", "سجل المدير/ة", "رقم هوية المدير",
-      "هوية المدير", "Principal ID", "principal_id",
+    // Link fields — use same fuzzy logic as schools parser
+    const principalIdInRow = pick(row, cm,
+      "سجل المديرة", "سجل المدير", "رقم هوية المديرة", "رقم هوية المدير",
+      "هوية المدير", "هوية المديرة", "principal id", "principal_id",
     );
-    const principalNameInRow = pick(row,
-      "اسم المدير", "اسم المديرة", "اسم المدير/ة", "المدير", "المديرة",
-      "Principal Name", "principal_name",
+    const principalNameInRow = pick(row, cm,
+      "اسم المديرة", "اسم المدير", "المديرة", "المدير",
+      "principal name", "principal_name",
     );
-    const schoolNameInRow = pick(row,
-      "اسم المدرسة", "المدرسة", "School Name", "school_name", "school",
+    const schoolNameInRow = pick(row, cm,
+      "اسم المدرسة", "المدرسة", "مدرسة", "school name", "school_name", "school",
     );
 
     let linkedSchool: School | undefined;
@@ -150,13 +198,13 @@ function parseGuards(
     if (!linkedSchool && schoolNameInRow) linkedSchool = linkedSchools.find((s) => s.name === schoolNameInRow);
     if (linkedSchool) linkedCount++;
 
-    const genderRaw = pick(row, "الجنس", "جنس الحارس", "Gender", "gender");
+    const genderRaw = pick(row, cm, "الجنس", "جنس الحارس", "gender");
     const gender: Guard["gender"] =
       genderRaw.includes("أنثى") || genderRaw.toLowerCase().includes("female") || genderRaw === "ف"
         ? "أنثى"
         : "ذكر";
 
-    const statusRaw = pick(row, "الحالة", "حالة الحارس", "Status", "status");
+    const statusRaw = pick(row, cm, "الحالة", "حالة الحارس", "status");
     const status: Guard["status"] =
       statusRaw.includes("غير") || statusRaw.toLowerCase().includes("inactive")
         ? "غير نشط"
@@ -165,35 +213,34 @@ function parseGuards(
     guards.push({
       id: generateId(),
       name,
-      nationalId: pick(row,
-        "السجل المدني", "رقم الهوية", "رقم السجل المدني", "هوية الحارس",
-        "National ID", "national_id", "الهوية",
+      nationalId: pick(row, cm,
+        "السجل المدني", "رقم السجل المدني", "رقم الهوية", "هوية الحارس",
+        "national id", "national_id",
       ),
-      phone: pick(row,
-        "رقم الجوال", "الجوال", "جوال الحارس", "رقم الهاتف",
-        "Phone", "phone", "هاتف",
+      phone: pick(row, cm,
+        "رقم الجوال", "جوال الحارس", "الجوال", "رقم الهاتف", "هاتف",
+        "phone",
       ),
       gender,
       status,
-      jobType: pick(row,
-        "نوع الوظيفة", "نوع الوظيفه", "Job Type", "job_type", "نوع العقد",
+      jobType: pick(row, cm,
+        "نوع الوظيفة", "نوع العقد", "job type", "job_type",
       ) || undefined,
-      jobTitle: pick(row,
-        "المسمى الوظيفي", "المسمى", "المسمى الوظيفى", "Job Title", "job_title",
-        "الوظيفة", "مسمى وظيفي",
+      jobTitle: pick(row, cm,
+        "المسمى الوظيفي", "المسمى", "الوظيفة", "job title", "job_title",
       ) || undefined,
-      rank: pick(row,
+      rank: pick(row, cm,
         "المرتبة", "الدرجة", "المرتبة/الدرجة", "الدرجة الوظيفية",
-        "Rank", "rank", "Grade",
+        "rank", "grade",
       ) || undefined,
-      appointmentCategory: pick(row,
-        "فئة التعيين", "Appointment Category", "appointment_category", "فئة",
+      appointmentCategory: pick(row, cm,
+        "فئة التعيين", "فئة", "appointment category", "appointment_category",
       ) || undefined,
-      region: pick(row,
-        "المنطقة", "Region", "region",
+      region: pick(row, cm,
+        "المنطقة", "region",
       ) || undefined,
-      governorate: pick(row,
-        "المحافظة", "محافظة", "Governorate", "governorate",
+      governorate: pick(row, cm,
+        "المحافظة", "محافظة", "governorate",
       ) || linkedSchool?.governorate || undefined,
       schoolId: linkedSchool?.id ?? null,
       schoolName: linkedSchool?.name ?? null,
