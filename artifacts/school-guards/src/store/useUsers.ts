@@ -12,6 +12,7 @@ export interface Employee {
   role: UserRole;
   status: UserStatus;
   createdAt: string;
+  lastLogin?: string;
 }
 
 export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
@@ -145,15 +146,29 @@ export function useUsers() {
     notifyUsers();
   }, []);
 
+  const resetPassword = useCallback((id: string, newPassword: string) => {
+    sharedEmployees = sharedEmployees.map((e) =>
+      e.id === id ? { ...e, password: newPassword } : e
+    );
+    saveEmployees(sharedEmployees);
+    notifyUsers();
+  }, []);
+
   const login = useCallback((username: string, password: string): Employee | null => {
     const user = sharedEmployees.find(
       (e) => e.username === username.trim() && e.password === password && e.status === "نشط"
     );
     if (user) {
-      sharedSession = user;
-      saveSession(user);
+      const now = new Date().toISOString();
+      sharedEmployees = sharedEmployees.map((e) =>
+        e.id === user.id ? { ...e, lastLogin: now } : e
+      );
+      saveEmployees(sharedEmployees);
+      const updated = { ...user, lastLogin: now };
+      sharedSession = updated;
+      saveSession(updated);
       notifyUsers();
-      return user;
+      return updated;
     }
     return null;
   }, []);
@@ -172,6 +187,7 @@ export function useUsers() {
     updateEmployee,
     deleteEmployee,
     toggleStatus,
+    resetPassword,
     login,
     logout,
   };
