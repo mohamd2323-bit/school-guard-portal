@@ -14,7 +14,9 @@ export default function Guards() {
       g.name.includes(search) ||
       g.nationalId.includes(search) ||
       g.phone.includes(search) ||
-      (g.schoolName || "").includes(search)
+      (g.schoolName || "").includes(search) ||
+      (g.jobType || "").includes(search) ||
+      (g.rank || "").includes(search)
   );
 
   const selectedSchool = selectedGuard
@@ -70,6 +72,8 @@ export default function Guards() {
                   <th>السجل المدني</th>
                   <th>رقم الجوال</th>
                   <th>المدرسة الحالية</th>
+                  <th>نوع الوظيفة</th>
+                  <th>المرتبة</th>
                   <th>الحالة</th>
                 </tr>
               </thead>
@@ -86,12 +90,33 @@ export default function Guards() {
                         <span>ملف</span>
                       </button>
                     </td>
-                    <td className="font-medium">{guard.name}</td>
+                    <td className="font-medium">
+                      <div className="flex items-center gap-1.5">
+                        {guard.isDemo && (
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" title="بيانات تجريبية" />
+                        )}
+                        {guard.name}
+                      </div>
+                    </td>
                     <td className="font-mono text-sm">{guard.nationalId}</td>
                     <td dir="ltr" className="text-right font-mono text-sm">
                       {guard.phone}
                     </td>
                     <td>{guard.schoolName || <span className="text-muted-foreground text-xs">غير محدد</span>}</td>
+                    <td>
+                      {guard.jobType ? (
+                        <span className="text-sm text-foreground">{guard.jobType}</span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </td>
+                    <td>
+                      {guard.rank ? (
+                        <span className="badge bg-teal-50 text-teal-700">{guard.rank}</span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </td>
                     <td>
                       <span className={`badge ${guard.status === "نشط" ? "badge-active" : "badge-inactive"}`}>
                         {guard.status}

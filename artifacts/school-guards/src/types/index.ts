@@ -7,6 +7,7 @@ export interface School {
   principalName: string;
   principalNationalId: string;
   principalPhone: string;
+  isDemo?: boolean;
 }
 
 export interface Guard {
@@ -18,6 +19,9 @@ export interface Guard {
   status: "نشط" | "غير نشط";
   schoolId: string | null;
   schoolName: string | null;
+  jobType?: string;
+  rank?: string;
+  isDemo?: boolean;
 }
 
 export interface ImportSummary {

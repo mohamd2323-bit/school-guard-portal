@@ -9,6 +9,8 @@ import {
   AlertCircle,
   Trash2,
   Info,
+  FlaskConical,
+  XCircle,
 } from "lucide-react";
 
 function generateId() {
@@ -21,11 +23,16 @@ function normalizeStr(s: unknown): string {
 }
 
 export default function DataManagement() {
-  const { importData, clearData, hasData, guards, schools } = useStore();
+  const { importData, clearData, clearDemoData, loadDemoData, hasData, hasDemoData, hasRealData, guards, schools } = useStore();
   const [summary, setSummary] = useState<ImportSummary | null>(null);
   const [importing, setImporting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const demoGuardsCount = guards.filter((g) => g.isDemo).length;
+  const demoSchoolsCount = schools.filter((s) => s.isDemo).length;
+  const realGuardsCount = guards.filter((g) => !g.isDemo).length;
+  const realSchoolsCount = schools.filter((s) => !s.isDemo).length;
 
   function processFile(file: File) {
     if (!file) return;
@@ -51,9 +58,7 @@ export default function DataManagement() {
 
         if (schoolSheetName) {
           const ws = workbook.Sheets[schoolSheetName];
-          const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
-            defval: "",
-          });
+          const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
 
           rows.forEach((row, i) => {
             const name = normalizeStr(
@@ -63,32 +68,16 @@ export default function DataManagement() {
               errors.push(`مدرسة - الصف ${i + 2}: اسم المدرسة مفقود`);
               return;
             }
-            const school: School = {
+            importedSchools.push({
               id: generateId(),
               name,
-              governorate: normalizeStr(
-                row["المحافظة"] ?? row["Governorate"] ?? row["governorate"] ?? ""
-              ),
-              level: normalizeStr(
-                row["المرحلة"] ?? row["Level"] ?? row["level"] ?? ""
-              ),
-              type: (normalizeStr(
-                row["النوع"] ?? row["Type"] ?? row["type"] ?? "بنين"
-              ) as School["type"]) || "بنين",
-              principalName: normalizeStr(
-                row["اسم المدير"] ?? row["اسم المديرة"] ?? row["اسم المدير/ة"] ??
-                row["Principal Name"] ?? row["principal_name"] ?? ""
-              ),
-              principalNationalId: normalizeStr(
-                row["سجل المدير"] ?? row["سجل المديرة"] ?? row["سجل المدير/ة"] ??
-                row["Principal ID"] ?? row["principal_id"] ?? ""
-              ),
-              principalPhone: normalizeStr(
-                row["جوال المدير"] ?? row["جوال المديرة"] ?? row["جوال المدير/ة"] ??
-                row["Principal Phone"] ?? row["principal_phone"] ?? ""
-              ),
-            };
-            importedSchools.push(school);
+              governorate: normalizeStr(row["المحافظة"] ?? row["Governorate"] ?? row["governorate"] ?? ""),
+              level: normalizeStr(row["المرحلة"] ?? row["Level"] ?? row["level"] ?? ""),
+              type: (normalizeStr(row["النوع"] ?? row["Type"] ?? row["type"] ?? "بنين") as School["type"]) || "بنين",
+              principalName: normalizeStr(row["اسم المدير"] ?? row["اسم المديرة"] ?? row["اسم المدير/ة"] ?? row["Principal Name"] ?? row["principal_name"] ?? ""),
+              principalNationalId: normalizeStr(row["سجل المدير"] ?? row["سجل المديرة"] ?? row["سجل المدير/ة"] ?? row["Principal ID"] ?? row["principal_id"] ?? ""),
+              principalPhone: normalizeStr(row["جوال المدير"] ?? row["جوال المديرة"] ?? row["جوال المدير/ة"] ?? row["Principal Phone"] ?? row["principal_phone"] ?? ""),
+            });
           });
         } else {
           errors.push("لم يتم العثور على ورقة المدارس (Schools)");
@@ -106,83 +95,43 @@ export default function DataManagement() {
 
         if (guardSheetName) {
           const ws = workbook.Sheets[guardSheetName];
-          const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
-            defval: "",
-          });
+          const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
 
           rows.forEach((row, i) => {
-            const name = normalizeStr(
-              row["اسم الحارس"] ?? row["الاسم"] ?? row["Guard Name"] ?? row["name"]
-            );
+            const name = normalizeStr(row["اسم الحارس"] ?? row["الاسم"] ?? row["Guard Name"] ?? row["name"]);
             if (!name) {
               errors.push(`حارس - الصف ${i + 2}: اسم الحارس مفقود`);
               return;
             }
 
-            const principalIdInRow = normalizeStr(
-              row["سجل المدير"] ?? row["سجل المديرة"] ?? row["سجل المدير/ة"] ??
-              row["Principal ID"] ?? row["principal_id"] ?? ""
-            );
-            const principalNameInRow = normalizeStr(
-              row["اسم المدير"] ?? row["اسم المديرة"] ?? row["اسم المدير/ة"] ??
-              row["Principal Name"] ?? row["principal_name"] ?? ""
-            );
-            const schoolNameInRow = normalizeStr(
-              row["اسم المدرسة"] ?? row["School Name"] ?? row["school_name"] ?? ""
-            );
+            const principalIdInRow = normalizeStr(row["سجل المدير"] ?? row["سجل المديرة"] ?? row["سجل المدير/ة"] ?? row["Principal ID"] ?? row["principal_id"] ?? "");
+            const principalNameInRow = normalizeStr(row["اسم المدير"] ?? row["اسم المديرة"] ?? row["اسم المدير/ة"] ?? row["Principal Name"] ?? row["principal_name"] ?? "");
+            const schoolNameInRow = normalizeStr(row["اسم المدرسة"] ?? row["School Name"] ?? row["school_name"] ?? "");
 
-            // Link: first try principal national ID, then principal name, then school name
             let linkedSchool: School | undefined;
-
-            if (principalIdInRow) {
-              linkedSchool = importedSchools.find(
-                (s) => s.principalNationalId === principalIdInRow
-              );
-            }
-            if (!linkedSchool && principalNameInRow) {
-              linkedSchool = importedSchools.find(
-                (s) => s.principalName === principalNameInRow
-              );
-            }
-            if (!linkedSchool && schoolNameInRow) {
-              linkedSchool = importedSchools.find(
-                (s) => s.name === schoolNameInRow
-              );
-            }
-
+            if (principalIdInRow) linkedSchool = importedSchools.find((s) => s.principalNationalId === principalIdInRow);
+            if (!linkedSchool && principalNameInRow) linkedSchool = importedSchools.find((s) => s.principalName === principalNameInRow);
+            if (!linkedSchool && schoolNameInRow) linkedSchool = importedSchools.find((s) => s.name === schoolNameInRow);
             if (linkedSchool) linkedCount++;
 
-            const genderRaw = normalizeStr(
-              row["الجنس"] ?? row["Gender"] ?? row["gender"] ?? "ذكر"
-            );
-            const gender: Guard["gender"] =
-              genderRaw.includes("أنثى") || genderRaw.toLowerCase().includes("female")
-                ? "أنثى"
-                : "ذكر";
+            const genderRaw = normalizeStr(row["الجنس"] ?? row["Gender"] ?? row["gender"] ?? "ذكر");
+            const gender: Guard["gender"] = genderRaw.includes("أنثى") || genderRaw.toLowerCase().includes("female") ? "أنثى" : "ذكر";
 
-            const statusRaw = normalizeStr(
-              row["الحالة"] ?? row["Status"] ?? row["status"] ?? "نشط"
-            );
-            const status: Guard["status"] =
-              statusRaw.includes("غير") || statusRaw.toLowerCase().includes("inactive")
-                ? "غير نشط"
-                : "نشط";
+            const statusRaw = normalizeStr(row["الحالة"] ?? row["Status"] ?? row["status"] ?? "نشط");
+            const status: Guard["status"] = statusRaw.includes("غير") || statusRaw.toLowerCase().includes("inactive") ? "غير نشط" : "نشط";
 
-            const guard: Guard = {
+            importedGuards.push({
               id: generateId(),
               name,
-              nationalId: normalizeStr(
-                row["السجل المدني"] ?? row["National ID"] ?? row["national_id"] ?? ""
-              ),
-              phone: normalizeStr(
-                row["رقم الجوال"] ?? row["الجوال"] ?? row["Phone"] ?? row["phone"] ?? ""
-              ),
+              nationalId: normalizeStr(row["السجل المدني"] ?? row["National ID"] ?? row["national_id"] ?? ""),
+              phone: normalizeStr(row["رقم الجوال"] ?? row["الجوال"] ?? row["Phone"] ?? row["phone"] ?? ""),
               gender,
               status,
+              jobType: normalizeStr(row["نوع الوظيفة"] ?? row["Job Type"] ?? row["job_type"] ?? "") || undefined,
+              rank: normalizeStr(row["المرتبة"] ?? row["Rank"] ?? row["rank"] ?? "") || undefined,
               schoolId: linkedSchool?.id ?? null,
               schoolName: linkedSchool?.name ?? null,
-            };
-            importedGuards.push(guard);
+            });
           });
         } else {
           errors.push("لم يتم العثور على ورقة الحراس (Guards)");
@@ -229,8 +178,46 @@ export default function DataManagement() {
       <div>
         <h2 className="text-xl font-bold text-foreground">إدارة البيانات</h2>
         <p className="text-muted-foreground text-sm mt-1">
-          استيراد بيانات الحراس والمدارس من ملف Excel
+          استيراد بيانات الحراس والمدارس من ملف Excel أو تحميل بيانات تجريبية
         </p>
+      </div>
+
+      {/* Demo data card */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
+        <div className="flex items-start gap-3">
+          <FlaskConical className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-semibold text-amber-900 text-sm">البيانات التجريبية</p>
+            <p className="text-amber-700 text-xs mt-1">
+              {hasDemoData
+                ? `يوجد حالياً ${demoGuardsCount} حارس و ${demoSchoolsCount} مدرسة تجريبية (${["أبها","أحد رفيدة","خميس مشيط","محايل عسير","بيشة","سراة عبيدة"].join("، ")})`
+                : "تحميل 25 حارساً و 20 مدرسة موزعة على 6 محافظات للاختبار"}
+            </p>
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            {!hasDemoData ? (
+              <button
+                onClick={loadDemoData}
+                className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                <FlaskConical className="w-4 h-4" />
+                تحميل البيانات التجريبية
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  if (confirm("هل أنت متأكد من حذف البيانات التجريبية؟ لن تتأثر البيانات المستوردة من Excel.")) {
+                    clearDemoData();
+                  }
+                }}
+                className="flex items-center gap-1.5 bg-white hover:bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                <XCircle className="w-4 h-4" />
+                حذف البيانات التجريبية
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Instructions */}
@@ -238,13 +225,13 @@ export default function DataManagement() {
         <div className="flex items-start gap-3">
           <Info className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
           <div className="space-y-2 text-sm">
-            <p className="font-semibold text-foreground">تعليمات الاستيراد</p>
+            <p className="font-semibold text-foreground">تعليمات استيراد Excel</p>
             <ul className="text-muted-foreground space-y-1.5 list-disc list-inside marker:text-primary">
               <li>يجب أن يحتوي الملف على ورقتين: <strong>Schools</strong> (المدارس) و <strong>Guards</strong> (الحراس)</li>
               <li>يتم قراءة ورقة المدارس أولاً ثم ورقة الحراس</li>
               <li>يتم ربط الحراس بالمدارس أولاً عبر سجل المدير، وإن لم يُوجد فعبر اسم المدير</li>
-              <li>يتم حفظ البيانات محلياً بشكل دائم في المتصفح</li>
-              <li>الاستيراد الجديد يستبدل البيانات القديمة بالكامل</li>
+              <li>يمكن إضافة حقلَي <strong>نوع الوظيفة</strong> و<strong>المرتبة</strong> في ورقة الحراس</li>
+              <li>البيانات المستوردة تُحفظ محلياً ولا تؤثر على البيانات التجريبية</li>
             </ul>
           </div>
         </div>
@@ -299,7 +286,7 @@ export default function DataManagement() {
         </div>
       </div>
 
-      {/* Summary */}
+      {/* Import Summary */}
       {summary && (
         <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-border flex items-center gap-2">
@@ -341,19 +328,19 @@ export default function DataManagement() {
         </div>
       )}
 
-      {/* Clear data */}
-      {hasData && (
+      {/* Clear real data */}
+      {hasRealData && (
         <div className="bg-white rounded-xl border border-red-200 p-5">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="font-semibold text-foreground text-sm">حذف جميع البيانات</p>
+              <p className="font-semibold text-foreground text-sm">حذف البيانات المستوردة</p>
               <p className="text-muted-foreground text-xs mt-0.5">
-                يوجد حالياً {guards.length} حارس و {schools.length} مدرسة
+                يوجد {realGuardsCount} حارس و {realSchoolsCount} مدرسة مستوردة من Excel
               </p>
             </div>
             <button
               onClick={() => {
-                if (confirm("هل أنت متأكد من حذف جميع البيانات؟ لا يمكن التراجع عن هذا الإجراء.")) {
+                if (confirm("هل أنت متأكد من حذف البيانات المستوردة؟ لا يمكن التراجع عن هذا الإجراء.")) {
                   clearData();
                   setSummary(null);
                 }
@@ -361,8 +348,41 @@ export default function DataManagement() {
               className="flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors border border-red-200"
             >
               <Trash2 className="w-4 h-4" />
-              حذف البيانات
+              حذف البيانات المستوردة
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Status summary */}
+      {hasData && (
+        <div className="bg-white rounded-xl border border-border p-5">
+          <p className="font-semibold text-foreground text-sm mb-3">ملخص البيانات الحالية</p>
+          <div className="grid grid-cols-2 gap-3">
+            {hasDemoData && (
+              <>
+                <div className="bg-amber-50 rounded-lg p-3 text-center">
+                  <p className="text-xl font-bold text-amber-700">{demoGuardsCount}</p>
+                  <p className="text-xs text-amber-600 mt-0.5">حارس تجريبي</p>
+                </div>
+                <div className="bg-amber-50 rounded-lg p-3 text-center">
+                  <p className="text-xl font-bold text-amber-700">{demoSchoolsCount}</p>
+                  <p className="text-xs text-amber-600 mt-0.5">مدرسة تجريبية</p>
+                </div>
+              </>
+            )}
+            {hasRealData && (
+              <>
+                <div className="bg-teal-50 rounded-lg p-3 text-center">
+                  <p className="text-xl font-bold text-teal-700">{realGuardsCount}</p>
+                  <p className="text-xs text-teal-600 mt-0.5">حارس مستورد</p>
+                </div>
+                <div className="bg-teal-50 rounded-lg p-3 text-center">
+                  <p className="text-xl font-bold text-teal-700">{realSchoolsCount}</p>
+                  <p className="text-xs text-teal-600 mt-0.5">مدرسة مستوردة</p>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
