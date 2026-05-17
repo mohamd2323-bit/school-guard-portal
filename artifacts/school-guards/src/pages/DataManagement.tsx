@@ -128,7 +128,11 @@ export default function DataManagement() {
               gender,
               status,
               jobType: normalizeStr(row["نوع الوظيفة"] ?? row["Job Type"] ?? row["job_type"] ?? "") || undefined,
-              rank: normalizeStr(row["المرتبة"] ?? row["Rank"] ?? row["rank"] ?? "") || undefined,
+              jobTitle: normalizeStr(row["المسمى الوظيفي"] ?? row["Job Title"] ?? row["job_title"] ?? "") || undefined,
+              rank: normalizeStr(row["المرتبة"] ?? row["الدرجة"] ?? row["المرتبة/الدرجة"] ?? row["Rank"] ?? row["rank"] ?? "") || undefined,
+              appointmentCategory: normalizeStr(row["فئة التعيين"] ?? row["Appointment Category"] ?? row["appointment_category"] ?? "") || undefined,
+              region: normalizeStr(row["المنطقة"] ?? row["Region"] ?? row["region"] ?? "") || undefined,
+              governorate: normalizeStr(row["المحافظة"] ?? row["Governorate"] ?? row["governorate"] ?? "") || linkedSchool?.governorate || undefined,
               schoolId: linkedSchool?.id ?? null,
               schoolName: linkedSchool?.name ?? null,
             });

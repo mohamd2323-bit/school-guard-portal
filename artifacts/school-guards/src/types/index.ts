@@ -20,7 +20,11 @@ export interface Guard {
   schoolId: string | null;
   schoolName: string | null;
   jobType?: string;
+  jobTitle?: string;
   rank?: string;
+  appointmentCategory?: string;
+  region?: string;
+  governorate?: string;
   isDemo?: boolean;
 }
 

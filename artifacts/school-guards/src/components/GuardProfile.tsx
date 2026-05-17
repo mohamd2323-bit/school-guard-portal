@@ -7,22 +7,44 @@ interface Props {
   onClose: () => void;
 }
 
-function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
+function InfoRow({
+  label,
+  value,
+  fallback = "—",
+}: {
+  label: string;
+  value: string | null | undefined;
+  fallback?: string;
+}) {
+  const display = value && value.trim() !== "" ? value.trim() : fallback;
   return (
     <div className="flex items-start gap-2 py-2 border-b border-border last:border-0">
-      <span className="text-muted-foreground text-sm w-36 flex-shrink-0">{label}</span>
-      <span className="text-foreground text-sm font-medium">{value || "—"}</span>
+      <span className="text-muted-foreground text-sm w-40 flex-shrink-0">{label}</span>
+      <span className={`text-sm font-medium ${display === fallback ? "text-muted-foreground" : "text-foreground"}`}>
+        {display}
+      </span>
     </div>
   );
 }
 
 export default function GuardProfile({ guard, school, onClose }: Props) {
+  const displaySchoolName =
+    guard.schoolName && guard.schoolName.trim() !== "" ? guard.schoolName : "لا يوجد";
+
+  const displayGovernorate =
+    guard.governorate && guard.governorate.trim() !== ""
+      ? guard.governorate
+      : school?.governorate || "غير محدد";
+
+  const displayRegion =
+    guard.region && guard.region.trim() !== "" ? guard.region : "عسير";
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" dir="rtl">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div
-          className="flex items-center justify-between px-6 py-4 rounded-t-2xl"
+          className="flex items-center justify-between px-6 py-4 rounded-t-2xl sticky top-0"
           style={{ background: "hsl(174 65% 28%)" }}
         >
           <div className="flex items-center gap-3">
@@ -31,7 +53,9 @@ export default function GuardProfile({ guard, school, onClose }: Props) {
             </div>
             <div>
               <h2 className="text-white font-bold text-base">{guard.name}</h2>
-              <p className="text-white/70 text-xs">ملف الحارس</p>
+              <p className="text-white/70 text-xs">
+                {guard.jobTitle || guard.jobType || "ملف الحارس"}
+              </p>
             </div>
           </div>
           <button
@@ -50,11 +74,25 @@ export default function GuardProfile({ guard, school, onClose }: Props) {
               <h3 className="font-bold text-sm text-foreground">بيانات الحارس</h3>
             </div>
             <div className="bg-muted/40 rounded-xl px-4 py-1">
-              <InfoRow label="الاسم" value={guard.name} />
+              <InfoRow label="اسم الحارس" value={guard.name} />
               <InfoRow label="السجل المدني" value={guard.nationalId} />
-              <InfoRow label="رقم الجوال" value={guard.phone} />
               <InfoRow label="الجنس" value={guard.gender} />
+              <InfoRow label="رقم الجوال" value={guard.phone} />
+              <InfoRow
+                label="المسمى الوظيفي"
+                value={guard.jobTitle || guard.jobType}
+                fallback="غير محدد"
+              />
+              <InfoRow label="المرتبة/الدرجة" value={guard.rank} fallback="غير محدد" />
+              <InfoRow
+                label="فئة التعيين"
+                value={guard.appointmentCategory}
+                fallback="غير محدد"
+              />
               <InfoRow label="الحالة" value={guard.status} />
+              <InfoRow label="المدرسة" value={displaySchoolName} />
+              <InfoRow label="المنطقة" value={displayRegion} />
+              <InfoRow label="المحافظة" value={displayGovernorate} />
             </div>
           </section>
 

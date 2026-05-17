@@ -46,7 +46,6 @@ export const demoSchools: School[] = [
     principalPhone: "0504234564",
     isDemo: true,
   },
-
   // ─── أحد رفيدة ───────────────────────────────────
   {
     id: "demo-school-005",
@@ -81,7 +80,6 @@ export const demoSchools: School[] = [
     principalPhone: "0507234567",
     isDemo: true,
   },
-
   // ─── خميس مشيط ───────────────────────────────────
   {
     id: "demo-school-008",
@@ -127,7 +125,6 @@ export const demoSchools: School[] = [
     principalPhone: "0511234571",
     isDemo: true,
   },
-
   // ─── محايل عسير ──────────────────────────────────
   {
     id: "demo-school-012",
@@ -162,7 +159,6 @@ export const demoSchools: School[] = [
     principalPhone: "0514234574",
     isDemo: true,
   },
-
   // ─── بيشة ─────────────────────────────────────────
   {
     id: "demo-school-015",
@@ -197,7 +193,6 @@ export const demoSchools: School[] = [
     principalPhone: "0517234577",
     isDemo: true,
   },
-
   // ─── سراة عبيدة ───────────────────────────────────
   {
     id: "demo-school-018",
@@ -246,7 +241,11 @@ export const demoGuards: Guard[] = [
     schoolId: "demo-school-001",
     schoolName: "ابتدائية الأمير فيصل",
     jobType: "حارس مدرسة",
+    jobTitle: "حارس مدرسة",
     rank: "الثالثة",
+    appointmentCategory: "عقد",
+    region: "عسير",
+    governorate: "أبها",
     isDemo: true,
   },
   {
@@ -259,7 +258,11 @@ export const demoGuards: Guard[] = [
     schoolId: "demo-school-003",
     schoolName: "ثانوية الجيل",
     jobType: "حارس مدرسة",
+    jobTitle: "حارس مدرسة",
     rank: "الثانية",
+    appointmentCategory: "نظامي",
+    region: "عسير",
+    governorate: "أبها",
     isDemo: true,
   },
   // ─── أبها — بنات ──────────────────────────────────
@@ -273,7 +276,11 @@ export const demoGuards: Guard[] = [
     schoolId: "demo-school-002",
     schoolName: "متوسطة الوفاء",
     jobType: "حارسة مدرسة",
+    jobTitle: "حارسة مدرسة",
     rank: "الأولى",
+    appointmentCategory: "عقد",
+    region: "عسير",
+    governorate: "أبها",
     isDemo: true,
   },
   {
@@ -286,7 +293,11 @@ export const demoGuards: Guard[] = [
     schoolId: "demo-school-004",
     schoolName: "ابتدائية الزهراء",
     jobType: "حارسة مدرسة",
+    jobTitle: "حارسة مدرسة",
     rank: "الثانية",
+    appointmentCategory: "عقد",
+    region: "عسير",
+    governorate: "أبها",
     isDemo: true,
   },
   // ─── أحد رفيدة — بنين ─────────────────────────────
@@ -300,7 +311,11 @@ export const demoGuards: Guard[] = [
     schoolId: "demo-school-005",
     schoolName: "ابتدائية النور",
     jobType: "حارس مدرسة",
+    jobTitle: "حارس مدرسة",
     rank: "الرابعة",
+    appointmentCategory: "نظامي",
+    region: "عسير",
+    governorate: "أحد رفيدة",
     isDemo: true,
   },
   {
@@ -313,7 +328,11 @@ export const demoGuards: Guard[] = [
     schoolId: "demo-school-007",
     schoolName: "ثانوية العزيمة",
     jobType: "حارس مدرسة",
+    jobTitle: "حارس مدرسة",
     rank: "الثالثة",
+    appointmentCategory: "عقد",
+    region: "عسير",
+    governorate: "أحد رفيدة",
     isDemo: true,
   },
   // ─── أحد رفيدة — بنات ─────────────────────────────
@@ -327,7 +346,11 @@ export const demoGuards: Guard[] = [
     schoolId: "demo-school-006",
     schoolName: "متوسطة الأمل",
     jobType: "حارسة مدرسة",
+    jobTitle: "حارسة مدرسة",
     rank: "الثانية",
+    appointmentCategory: "عقد",
+    region: "عسير",
+    governorate: "أحد رفيدة",
     isDemo: true,
   },
   // ─── خميس مشيط — بنين ─────────────────────────────
@@ -341,7 +364,11 @@ export const demoGuards: Guard[] = [
     schoolId: "demo-school-009",
     schoolName: "متوسطة التحدي",
     jobType: "حارس مدرسة",
+    jobTitle: "حارس مدرسة",
     rank: "الثانية",
+    appointmentCategory: "نظامي",
+    region: "عسير",
+    governorate: "خميس مشيط",
     isDemo: true,
   },
   {
@@ -354,7 +381,11 @@ export const demoGuards: Guard[] = [
     schoolId: "demo-school-011",
     schoolName: "ابتدائية السلام",
     jobType: "حارس مدرسة",
+    jobTitle: "حارس مدرسة",
     rank: "الأولى",
+    appointmentCategory: "عقد",
+    region: "عسير",
+    governorate: "خميس مشيط",
     isDemo: true,
   },
   // ─── خميس مشيط — بنات ─────────────────────────────
@@ -368,7 +399,11 @@ export const demoGuards: Guard[] = [
     schoolId: "demo-school-008",
     schoolName: "ابتدائية الروضة",
     jobType: "حارسة مدرسة",
+    jobTitle: "حارسة مدرسة",
     rank: "الثالثة",
+    appointmentCategory: "عقد",
+    region: "عسير",
+    governorate: "خميس مشيط",
     isDemo: true,
   },
   {
@@ -381,7 +416,11 @@ export const demoGuards: Guard[] = [
     schoolId: "demo-school-010",
     schoolName: "ثانوية الهلال",
     jobType: "حارسة مدرسة",
+    jobTitle: "حارسة مدرسة",
     rank: "الرابعة",
+    appointmentCategory: "نظامي",
+    region: "عسير",
+    governorate: "خميس مشيط",
     isDemo: true,
   },
   // ─── محايل عسير — بنين ────────────────────────────
@@ -395,7 +434,11 @@ export const demoGuards: Guard[] = [
     schoolId: "demo-school-013",
     schoolName: "متوسطة العروبة",
     jobType: "حارس مدرسة",
+    jobTitle: "حارس مدرسة",
     rank: "الثالثة",
+    appointmentCategory: "عقد",
+    region: "عسير",
+    governorate: "محايل عسير",
     isDemo: true,
   },
   // ─── محايل عسير — بنات ────────────────────────────
@@ -409,7 +452,11 @@ export const demoGuards: Guard[] = [
     schoolId: "demo-school-012",
     schoolName: "ابتدائية الفجر",
     jobType: "حارسة مدرسة",
+    jobTitle: "حارسة مدرسة",
     rank: "الأولى",
+    appointmentCategory: "عقد",
+    region: "عسير",
+    governorate: "محايل عسير",
     isDemo: true,
   },
   {
@@ -422,7 +469,11 @@ export const demoGuards: Guard[] = [
     schoolId: "demo-school-014",
     schoolName: "ثانوية الرسالة",
     jobType: "حارسة مدرسة",
+    jobTitle: "حارسة مدرسة",
     rank: "الثانية",
+    appointmentCategory: "نظامي",
+    region: "عسير",
+    governorate: "محايل عسير",
     isDemo: true,
   },
   // ─── بيشة — بنين ──────────────────────────────────
@@ -436,7 +487,11 @@ export const demoGuards: Guard[] = [
     schoolId: "demo-school-015",
     schoolName: "ابتدائية الريان",
     jobType: "حارس مدرسة",
+    jobTitle: "حارس مدرسة",
     rank: "الثانية",
+    appointmentCategory: "عقد",
+    region: "عسير",
+    governorate: "بيشة",
     isDemo: true,
   },
   {
@@ -449,7 +504,11 @@ export const demoGuards: Guard[] = [
     schoolId: "demo-school-017",
     schoolName: "ثانوية الواحة",
     jobType: "حارس مدرسة",
+    jobTitle: "حارس مدرسة",
     rank: "الرابعة",
+    appointmentCategory: "نظامي",
+    region: "عسير",
+    governorate: "بيشة",
     isDemo: true,
   },
   // ─── بيشة — بنات ──────────────────────────────────
@@ -463,7 +522,11 @@ export const demoGuards: Guard[] = [
     schoolId: "demo-school-016",
     schoolName: "متوسطة الإشراق",
     jobType: "حارسة مدرسة",
+    jobTitle: "حارسة مدرسة",
     rank: "الثالثة",
+    appointmentCategory: "عقد",
+    region: "عسير",
+    governorate: "بيشة",
     isDemo: true,
   },
   // ─── سراة عبيدة — بنين ────────────────────────────
@@ -477,7 +540,11 @@ export const demoGuards: Guard[] = [
     schoolId: "demo-school-019",
     schoolName: "متوسطة الإخلاص",
     jobType: "حارس مدرسة",
+    jobTitle: "حارس مدرسة",
     rank: "الأولى",
+    appointmentCategory: "نظامي",
+    region: "عسير",
+    governorate: "سراة عبيدة",
     isDemo: true,
   },
   // ─── سراة عبيدة — بنات ────────────────────────────
@@ -491,7 +558,11 @@ export const demoGuards: Guard[] = [
     schoolId: "demo-school-018",
     schoolName: "ابتدائية البشرى",
     jobType: "حارسة مدرسة",
+    jobTitle: "حارسة مدرسة",
     rank: "الثانية",
+    appointmentCategory: "عقد",
+    region: "عسير",
+    governorate: "سراة عبيدة",
     isDemo: true,
   },
   {
@@ -504,7 +575,11 @@ export const demoGuards: Guard[] = [
     schoolId: "demo-school-020",
     schoolName: "ثانوية المستقبل",
     jobType: "حارسة مدرسة",
+    jobTitle: "حارسة مدرسة",
     rank: "الثالثة",
+    appointmentCategory: "نظامي",
+    region: "عسير",
+    governorate: "سراة عبيدة",
     isDemo: true,
   },
   // ─── غير مرتبطين بمدارس ───────────────────────────
@@ -518,7 +593,11 @@ export const demoGuards: Guard[] = [
     schoolId: null,
     schoolName: null,
     jobType: "حارس مدرسة",
+    jobTitle: "حارس مدرسة",
     rank: "الثالثة",
+    appointmentCategory: "عقد",
+    region: "عسير",
+    governorate: "أبها",
     isDemo: true,
   },
   {
@@ -531,7 +610,11 @@ export const demoGuards: Guard[] = [
     schoolId: null,
     schoolName: null,
     jobType: "حارس مدرسة",
+    jobTitle: "حارس مدرسة",
     rank: "الثانية",
+    appointmentCategory: "نظامي",
+    region: "عسير",
+    governorate: "خميس مشيط",
     isDemo: true,
   },
   {
@@ -544,7 +627,11 @@ export const demoGuards: Guard[] = [
     schoolId: null,
     schoolName: null,
     jobType: "حارسة مدرسة",
+    jobTitle: "حارسة مدرسة",
     rank: "الأولى",
+    appointmentCategory: "عقد",
+    region: "عسير",
+    governorate: "بيشة",
     isDemo: true,
   },
   {
@@ -557,7 +644,11 @@ export const demoGuards: Guard[] = [
     schoolId: null,
     schoolName: null,
     jobType: "حارس مدرسة",
+    jobTitle: "حارس مدرسة",
     rank: "الخامسة",
+    appointmentCategory: "نظامي",
+    region: "عسير",
+    governorate: "محايل عسير",
     isDemo: true,
   },
   {
@@ -570,7 +661,11 @@ export const demoGuards: Guard[] = [
     schoolId: null,
     schoolName: null,
     jobType: "حارسة مدرسة",
+    jobTitle: "حارسة مدرسة",
     rank: "الرابعة",
+    appointmentCategory: "عقد",
+    region: "عسير",
+    governorate: "سراة عبيدة",
     isDemo: true,
   },
 ];
