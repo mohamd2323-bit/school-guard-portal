@@ -573,10 +573,13 @@ interface LetterData {
   issueDate: string;
 }
 
-function genRef() {
-  const y = new Date().getFullYear();
-  const n = Math.floor(1000 + Math.random() * 9000);
-  return `${n}/${y}`;
+const LETTER_NUM_KEY = "school_guards_letter_num";
+
+function genLetterNumber(): string {
+  const current = parseInt(localStorage.getItem(LETTER_NUM_KEY) ?? "0", 10);
+  const next = isNaN(current) ? 1 : current + 1;
+  localStorage.setItem(LETTER_NUM_KEY, String(next));
+  return String(next).padStart(6, "0");
 }
 
 function formatDateAr(d: string) {
@@ -645,7 +648,7 @@ function buildLetterHTML(l: LetterData): string {
     /* ── Official Header ── */
     .letterhead {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
       padding-bottom: 14px;
       margin-bottom: 0;
@@ -697,43 +700,21 @@ function buildLetterHTML(l: LetterData): string {
       color: #666;
     }
 
-    /* Left block: Bismillah / decorative */
-    .header-left {
-      text-align: center;
+    /* Left block: Letter metadata */
+    .meta-left {
       flex-shrink: 0;
-      width: 120px;
-    }
-
-    .bismillah {
-      font-size: 15px;
-      color: #1a7a6e;
-      font-weight: bold;
-      line-height: 1.6;
-    }
-
-    .header-sub-line {
-      font-size: 10px;
-      color: #aaa;
-      margin-top: 4px;
-    }
-
-    /* ── Reference bar ── */
-    .meta-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #f4faf9;
+      text-align: right;
       border: 1px solid #c8e6e0;
-      border-radius: 6px;
-      padding: 9px 16px;
-      margin: 18px 0;
-      font-size: 12px;
-      color: #444;
+      border-radius: 8px;
+      padding: 12px 16px;
+      background: #f4faf9;
+      min-width: 148px;
     }
 
-    .meta-bar .meta-item { display: flex; align-items: center; gap: 6px; }
-    .meta-bar .meta-label { color: #777; }
-    .meta-bar .meta-value { font-weight: 700; color: #1a7a6e; font-size: 13px; }
+    .meta-left table { border-collapse: collapse; width: 100%; }
+    .meta-left td { padding: 3px 0; font-size: 12.5px; vertical-align: top; }
+    .meta-left .ml-label { color: #555; font-weight: 600; white-space: nowrap; padding-left: 8px; }
+    .meta-left .ml-value { color: #1a7a6e; font-weight: 800; font-size: 13px; }
 
     /* ── Recipient block ── */
     .recipient {
@@ -899,7 +880,7 @@ function buildLetterHTML(l: LetterData): string {
       .page { padding: 0 !important; max-width: 100% !important; }
       .stamp-circle { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       .subject { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .meta-bar { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .meta-left { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
   </style>
 </head>
@@ -915,33 +896,30 @@ function buildLetterHTML(l: LetterData): string {
       <div class="identity-text">
         <p class="id-kingdom">المملكة العربية السعودية</p>
         <p class="id-ministry">وزارة التعليم</p>
+        <p class="id-dept">الإدارة العامة للتعليم بمنطقة عسير</p>
         <p class="id-dept">إدارة الأمن والسلامة والمرافق</p>
         <p class="id-sub">الأمن المدرسي &mdash; تعليم عسير</p>
       </div>
     </div>
 
-    <!-- LEFT: Bismillah -->
-    <div class="header-left">
-      <div class="bismillah">بسم الله<br>الرحمن الرحيم</div>
-      <div class="header-sub-line">نظام إدارة الحراسات المدرسية</div>
+    <!-- LEFT: Letter metadata -->
+    <div class="meta-left">
+      <table>
+        <tr>
+          <td class="ml-label">الرقم:</td>
+          <td class="ml-value">${l.refNumber}</td>
+        </tr>
+        <tr>
+          <td class="ml-label">التاريخ:</td>
+          <td class="ml-value">${formatDateAr(l.issueDate)}</td>
+        </tr>
+        <tr>
+          <td class="ml-label">المرفقات:</td>
+          <td class="ml-value" style="color:#555;font-weight:600;font-size:12px;">لا يوجد</td>
+        </tr>
+      </table>
     </div>
 
-  </div>
-
-  <!-- ══ REFERENCE BAR ══ -->
-  <div class="meta-bar">
-    <div class="meta-item">
-      <span class="meta-label">رقم الخطاب:</span>
-      <span class="meta-value">${l.refNumber}</span>
-    </div>
-    <div class="meta-item">
-      <span class="meta-label">التاريخ:</span>
-      <span class="meta-value">${formatDateAr(l.issueDate)}</span>
-    </div>
-    <div class="meta-item">
-      <span class="meta-label">الجهة:</span>
-      <span class="meta-value">إدارة تعليم عسير</span>
-    </div>
   </div>
 
   <!-- ══ RECIPIENT ══ -->
@@ -1103,7 +1081,7 @@ function AssignmentModal({ guards, onClose }: { guards: Guard[]; onClose: () => 
       endDate,
       reason: reason.trim(),
       notes: notes.trim(),
-      refNumber: genRef(),
+      refNumber: genLetterNumber(),
       issueDate: todayStr(),
     };
     setLetterData(ld);
@@ -1146,19 +1124,38 @@ function AssignmentModal({ guards, onClose }: { guards: Guard[]; onClose: () => 
           <div className="overflow-y-auto flex-1 p-6">
             <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
               {/* Letterhead preview */}
-              <div className="text-center py-5 px-6 border-b-2 border-double"
+              <div className="flex items-start justify-between px-5 py-4 border-b-2 border-double gap-4"
                 style={{ borderColor: "#1a7a6e" }}>
-                <p className="text-xs text-muted-foreground">المملكة العربية السعودية</p>
-                <p className="text-base font-bold mt-0.5" style={{ color: "#1a7a6e" }}>وزارة التعليم</p>
-                <p className="text-xs text-muted-foreground">إدارة الأمن والسلامة والمرافق | الأمن المدرسي — تعليم عسير</p>
+                {/* Right: identity */}
+                <div className="text-right">
+                  <p className="text-[10px] text-muted-foreground">المملكة العربية السعودية</p>
+                  <p className="text-sm font-black mt-0.5" style={{ color: "#1a7a6e" }}>وزارة التعليم</p>
+                  <p className="text-[11px] text-foreground/70 font-semibold">الإدارة العامة للتعليم بمنطقة عسير</p>
+                  <p className="text-[11px] text-foreground/70 font-semibold">إدارة الأمن والسلامة والمرافق</p>
+                  <p className="text-[10px] text-muted-foreground">الأمن المدرسي — تعليم عسير</p>
+                </div>
+                {/* Left: metadata */}
+                <div className="text-right border border-primary/20 bg-primary/5 rounded-lg px-3 py-2 flex-shrink-0">
+                  <table className="text-xs">
+                    <tbody>
+                      <tr>
+                        <td className="text-muted-foreground font-semibold pl-3 py-0.5">الرقم:</td>
+                        <td className="font-black text-primary tracking-wide">{letterData.refNumber}</td>
+                      </tr>
+                      <tr>
+                        <td className="text-muted-foreground font-semibold pl-3 py-0.5">التاريخ:</td>
+                        <td className="font-bold text-foreground">{formatDateAr(letterData.issueDate)}</td>
+                      </tr>
+                      <tr>
+                        <td className="text-muted-foreground font-semibold pl-3 py-0.5">المرفقات:</td>
+                        <td className="text-muted-foreground">لا يوجد</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               <div className="p-6 space-y-4 text-sm leading-relaxed" style={{ fontFamily: "serif" }}>
-                {/* Meta */}
-                <div className="flex justify-between text-xs bg-muted/40 rounded-lg px-4 py-2.5 border border-border">
-                  <span>رقم الخطاب: <span className="font-bold text-primary">{letterData.refNumber}</span></span>
-                  <span>التاريخ: <span className="font-bold text-primary">{formatDateAr(letterData.issueDate)}</span></span>
-                </div>
 
                 {/* Recipient */}
                 <div className="border-r-4 border-primary bg-primary/5 rounded-l-lg pr-4 pl-3 py-3">
