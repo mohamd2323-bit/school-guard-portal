@@ -7,6 +7,7 @@ import {
   ClipboardList,
   Headphones,
   Settings2,
+  AlertTriangle,
   Menu,
   X,
 } from "lucide-react";
@@ -18,6 +19,7 @@ const navItems = [
   { href: "/schools", label: "إدارة المدارس", icon: School },
   { href: "/needs", label: "الاحتياج", icon: ClipboardList },
   { href: "/operations", label: "إدارة العمليات", icon: Settings2 },
+  { href: "/violations", label: "المخالفات", icon: AlertTriangle },
   { href: "/tickets", label: "بلاغات الدعم الموحد", icon: Headphones },
   { href: "/data", label: "إدارة البيانات", icon: Database },
 ];
@@ -48,10 +50,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <p className="text-white font-bold text-xs leading-snug mt-0.5">إدارة الأمن والسلامة</p>
             <p className="text-white/80 text-[10px] leading-tight mt-0.5">الأمن المدرسي — تعليم عسير</p>
           </div>
-          <button
-            className="lg:hidden text-white/70 hover:text-white flex-shrink-0"
-            onClick={() => setMobileOpen(false)}
-          >
+          <button className="lg:hidden text-white/70 hover:text-white flex-shrink-0" onClick={() => setMobileOpen(false)}>
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -86,20 +85,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile overlay */}
       {mobileOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
+        <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setMobileOpen(false)} />
       )}
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar */}
         <header className="bg-white border-b border-border px-6 py-4 flex items-center gap-4 sticky top-0 z-30">
-          <button
-            className="lg:hidden p-2 rounded-lg hover:bg-muted text-foreground"
-            onClick={() => setMobileOpen(true)}
-          >
+          <button className="lg:hidden p-2 rounded-lg hover:bg-muted text-foreground" onClick={() => setMobileOpen(true)}>
             <Menu className="w-5 h-5" />
           </button>
           <h1 className="text-base font-bold text-foreground">
@@ -110,8 +102,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             )?.label ?? "بوابة الحراسات المدرسية"}
           </h1>
         </header>
-
-        {/* Content */}
         <main className="flex-1 p-6">{children}</main>
       </div>
     </div>

@@ -7,6 +7,7 @@ import type {
   Ticket,
   TicketStatus,
   Operation,
+  Violation,
   AppData,
 } from "../types";
 import { demoGuards, demoSchools } from "../data/demoData";
@@ -16,7 +17,7 @@ const STORAGE_KEY = "school_guards_data";
 function loadFromStorage(): AppData {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { guards: [], schools: [], needs: [], tickets: [], operations: [] };
+    if (!raw) return { guards: [], schools: [], needs: [], tickets: [], operations: [], violations: [] };
     const parsed = JSON.parse(raw) as Partial<AppData>;
     return {
       guards: parsed.guards ?? [],
@@ -24,9 +25,10 @@ function loadFromStorage(): AppData {
       needs: parsed.needs ?? [],
       tickets: parsed.tickets ?? [],
       operations: parsed.operations ?? [],
+      violations: parsed.violations ?? [],
     };
   } catch {
-    return { guards: [], schools: [], needs: [], tickets: [], operations: [] };
+    return { guards: [], schools: [], needs: [], tickets: [], operations: [], violations: [] };
   }
 }
 
@@ -102,57 +104,41 @@ export function useStore() {
 
   const updateNeedStatus = useCallback(
     (id: string, status: NeedStatus) =>
-      setData({
-        ...sharedData,
-        needs: sharedData.needs.map((n) => (n.id === id ? { ...n, status } : n)),
-      }),
+      setData({ ...sharedData, needs: sharedData.needs.map((n) => (n.id === id ? { ...n, status } : n)) }),
     [setData]
   );
 
   const deleteNeed = useCallback(
-    (id: string) =>
-      setData({ ...sharedData, needs: sharedData.needs.filter((n) => n.id !== id) }),
+    (id: string) => setData({ ...sharedData, needs: sharedData.needs.filter((n) => n.id !== id) }),
     [setData]
   );
 
   // ── Tickets ────────────────────────────────────────────────────────────────
   const addTicket = useCallback(
-    (ticket: Ticket) =>
-      setData({ ...sharedData, tickets: [ticket, ...sharedData.tickets] }),
+    (ticket: Ticket) => setData({ ...sharedData, tickets: [ticket, ...sharedData.tickets] }),
     [setData]
   );
 
   const updateTicket = useCallback(
     (id: string, patch: Partial<Ticket>) =>
-      setData({
-        ...sharedData,
-        tickets: sharedData.tickets.map((t) =>
-          t.id === id ? { ...t, ...patch } : t
-        ),
-      }),
+      setData({ ...sharedData, tickets: sharedData.tickets.map((t) => (t.id === id ? { ...t, ...patch } : t)) }),
     [setData]
   );
 
   const deleteTicket = useCallback(
-    (id: string) =>
-      setData({ ...sharedData, tickets: sharedData.tickets.filter((t) => t.id !== id) }),
+    (id: string) => setData({ ...sharedData, tickets: sharedData.tickets.filter((t) => t.id !== id) }),
     [setData]
   );
 
   // ── Operations ─────────────────────────────────────────────────────────────
   const addOperation = useCallback(
-    (op: Operation) =>
-      setData({ ...sharedData, operations: [op, ...sharedData.operations] }),
+    (op: Operation) => setData({ ...sharedData, operations: [op, ...sharedData.operations] }),
     [setData]
   );
 
   const addGuard = useCallback(
     (guard: Guard, op: Operation) =>
-      setData({
-        ...sharedData,
-        guards: [guard, ...sharedData.guards],
-        operations: [op, ...sharedData.operations],
-      }),
+      setData({ ...sharedData, guards: [guard, ...sharedData.guards], operations: [op, ...sharedData.operations] }),
     [setData]
   );
 
@@ -166,12 +152,27 @@ export function useStore() {
     [setData]
   );
 
+  // ── Violations ─────────────────────────────────────────────────────────────
+  const addViolation = useCallback(
+    (v: Violation) => setData({ ...sharedData, violations: [v, ...sharedData.violations] }),
+    [setData]
+  );
+
+  const updateViolation = useCallback(
+    (id: string, patch: Partial<Violation>) =>
+      setData({ ...sharedData, violations: sharedData.violations.map((v) => (v.id === id ? { ...v, ...patch } : v)) }),
+    [setData]
+  );
+
+  const deleteViolation = useCallback(
+    (id: string) => setData({ ...sharedData, violations: sharedData.violations.filter((v) => v.id !== id) }),
+    [setData]
+  );
+
   const hasDemoData =
-    sharedData.guards.some((g) => g.isDemo) ||
-    sharedData.schools.some((s) => s.isDemo);
+    sharedData.guards.some((g) => g.isDemo) || sharedData.schools.some((s) => s.isDemo);
   const hasRealData =
-    sharedData.guards.some((g) => !g.isDemo) ||
-    sharedData.schools.some((s) => !s.isDemo);
+    sharedData.guards.some((g) => !g.isDemo) || sharedData.schools.some((s) => !s.isDemo);
 
   return {
     guards: sharedData.guards,
@@ -179,6 +180,7 @@ export function useStore() {
     needs: sharedData.needs,
     tickets: sharedData.tickets,
     operations: sharedData.operations,
+    violations: sharedData.violations,
     importData,
     clearData,
     loadDemoData,
@@ -192,6 +194,9 @@ export function useStore() {
     addOperation,
     addGuard,
     updateGuard,
+    addViolation,
+    updateViolation,
+    deleteViolation,
     hasDemoData,
     hasRealData,
     hasData: sharedData.guards.length > 0 || sharedData.schools.length > 0,

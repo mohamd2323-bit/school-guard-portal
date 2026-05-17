@@ -1,4 +1,7 @@
-import { X, User, School, UserCheck, History, ArrowLeftRight, UserPlus, Briefcase, Wallet, Pencil } from "lucide-react";
+import {
+  X, User, School, UserCheck, History, AlertTriangle,
+  ArrowLeftRight, UserPlus, Briefcase, Wallet, Pencil,
+} from "lucide-react";
 import type { Guard, School as SchoolType, Operation, OperationType } from "../types";
 import { useStore } from "../store/useStore";
 
@@ -8,11 +11,7 @@ interface Props {
   onClose: () => void;
 }
 
-function InfoRow({
-  label,
-  value,
-  fallback = "—",
-}: {
+function InfoRow({ label, value, fallback = "—" }: {
   label: string;
   value: string | null | undefined;
   fallback?: string;
@@ -44,72 +43,71 @@ const OP_COLORS: Record<OperationType, string> = {
   "تعديل بيانات": "bg-purple-50 text-purple-700",
 };
 
+const VIOLATION_STATUS_COLORS: Record<string, string> = {
+  "جديد": "bg-blue-100 text-blue-800",
+  "تحت الإجراء": "bg-amber-100 text-amber-800",
+  "مغلق": "bg-gray-100 text-gray-600",
+};
+
+const VIOLATION_TYPE_COLORS: Record<string, string> = {
+  "شكوى": "bg-red-50 text-red-700",
+  "ملاحظة": "bg-blue-50 text-blue-700",
+  "بلاغ": "bg-amber-50 text-amber-700",
+  "مخالفة": "bg-rose-50 text-rose-800",
+  "أخرى": "bg-gray-50 text-gray-600",
+};
+
 function formatDate(d: string) {
   if (!d) return "—";
   try {
-    return new Date(d).toLocaleDateString("ar-SA", {
-      year: "numeric", month: "short", day: "numeric",
-    });
+    return new Date(d).toLocaleDateString("ar-SA", { year: "numeric", month: "short", day: "numeric" });
   } catch { return d; }
 }
 
 function opSummary(op: Operation): string {
   const d = op.details;
   switch (op.type) {
-    case "نقل حارس":
-      return `من ${d.fromSchoolName || "—"} إلى ${d.toSchoolName || "—"}`;
-    case "إضافة حارس":
-      return `تمت الإضافة في ${d.schoolName || "—"}`;
-    case "تكليف حارس":
-      return `تكليف في ${d.entity || "—"} من ${d.startDate || ""} إلى ${d.endDate || ""}`;
-    case "بدل حارس":
-      return `حالة البدل: ${d.allowanceStatus || "—"}`;
-    case "تعديل بيانات":
-      return d.summary || "تعديل بيانات الحارس";
-    default:
-      return "";
+    case "نقل حارس": return `من ${d.fromSchoolName || "—"} إلى ${d.toSchoolName || "—"}`;
+    case "إضافة حارس": return `تمت الإضافة في ${d.schoolName || "—"}`;
+    case "تكليف حارس": return `تكليف في ${d.entity || "—"} (${d.startDate || ""}–${d.endDate || ""})`;
+    case "بدل حارس": return `حالة البدل: ${d.allowanceStatus || "—"}`;
+    case "تعديل بيانات": return d.summary || "تعديل البيانات الأساسية";
+    default: return "";
   }
 }
 
 export default function GuardProfile({ guard, school, onClose }: Props) {
-  const { operations } = useStore();
+  const { operations, violations } = useStore();
 
   const guardOps = operations
     .filter((op) => op.guardId === guard.id)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  const displaySchoolName =
-    guard.schoolName && guard.schoolName.trim() !== "" ? guard.schoolName : "لا يوجد";
-  const displayGovernorate =
-    guard.governorate && guard.governorate.trim() !== ""
-      ? guard.governorate
-      : school?.governorate || "غير محدد";
-  const displayRegion =
-    guard.region && guard.region.trim() !== "" ? guard.region : "عسير";
+  const guardViolations = violations
+    .filter((v) => v.guardId === guard.id)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const displaySchoolName = guard.schoolName?.trim() || "لا يوجد";
+  const displayGovernorate = guard.governorate?.trim() || school?.governorate || "غير محدد";
+  const displayRegion = guard.region?.trim() || "عسير";
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" dir="rtl">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div
-          className="flex items-center justify-between px-6 py-4 rounded-t-2xl sticky top-0"
-          style={{ background: "hsl(174 65% 28%)" }}
-        >
+        <div className="flex items-center justify-between px-6 py-4 rounded-t-2xl sticky top-0"
+          style={{ background: "hsl(174 65% 28%)" }}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
               <User className="w-5 h-5 text-white" />
             </div>
             <div>
               <h2 className="text-white font-bold text-base">{guard.name}</h2>
-              <p className="text-white/70 text-xs">
-                {guard.jobTitle || guard.jobType || "ملف الحارس"}
-              </p>
+              <p className="text-white/70 text-xs">{guard.jobTitle || guard.jobType || "ملف الحارس"}</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
-          >
+          <button onClick={onClose}
+            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -150,9 +148,7 @@ export default function GuardProfile({ guard, school, onClose }: Props) {
                 <InfoRow label="النوع" value={school.type} />
               </div>
             ) : (
-              <div className="bg-muted/40 rounded-xl px-4 py-3 text-center text-muted-foreground text-sm">
-                لا توجد مدرسة مرتبطة
-              </div>
+              <div className="bg-muted/40 rounded-xl px-4 py-3 text-center text-muted-foreground text-sm">لا توجد مدرسة مرتبطة</div>
             )}
           </section>
 
@@ -169,8 +165,43 @@ export default function GuardProfile({ guard, school, onClose }: Props) {
                 <InfoRow label="جوال المدير/ة" value={school.principalPhone} />
               </div>
             ) : (
-              <div className="bg-muted/40 rounded-xl px-4 py-3 text-center text-muted-foreground text-sm">
-                لا توجد بيانات مدير
+              <div className="bg-muted/40 rounded-xl px-4 py-3 text-center text-muted-foreground text-sm">لا توجد بيانات مدير</div>
+            )}
+          </section>
+
+          {/* Violations */}
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle className="w-4 h-4 text-rose-600" />
+              <h3 className="font-bold text-sm text-foreground">المخالفات والشكاوى</h3>
+              {guardViolations.length > 0 && (
+                <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full">{guardViolations.length}</span>
+              )}
+            </div>
+            {guardViolations.length === 0 ? (
+              <div className="bg-muted/40 rounded-xl px-4 py-4 text-center text-muted-foreground text-sm">لا توجد مخالفات مسجلة</div>
+            ) : (
+              <div className="space-y-2">
+                {guardViolations.map((v) => (
+                  <div key={v.id} className="bg-muted/40 rounded-xl px-4 py-3">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className={`badge text-xs ${VIOLATION_TYPE_COLORS[v.type] || "bg-gray-50 text-gray-600"}`}>
+                          {v.type}
+                        </span>
+                        <span className="font-mono text-xs text-muted-foreground">{v.caseNumber}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`badge text-xs ${VIOLATION_STATUS_COLORS[v.status] || ""}`}>{v.status}</span>
+                        <span className="text-xs text-muted-foreground">{formatDate(v.reportDate)}</span>
+                      </div>
+                    </div>
+                    <p className="text-sm text-foreground mt-1.5 line-clamp-2">{v.description}</p>
+                    {v.actionTaken && (
+                      <p className="text-xs text-muted-foreground mt-1">الإجراء: {v.actionTaken}</p>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </section>
@@ -181,34 +212,24 @@ export default function GuardProfile({ guard, school, onClose }: Props) {
               <History className="w-4 h-4 text-primary" />
               <h3 className="font-bold text-sm text-foreground">سجل العمليات</h3>
               {guardOps.length > 0 && (
-                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                  {guardOps.length}
-                </span>
+                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{guardOps.length}</span>
               )}
             </div>
             {guardOps.length === 0 ? (
-              <div className="bg-muted/40 rounded-xl px-4 py-4 text-center text-muted-foreground text-sm">
-                لا توجد عمليات مسجلة
-              </div>
+              <div className="bg-muted/40 rounded-xl px-4 py-4 text-center text-muted-foreground text-sm">لا توجد عمليات مسجلة</div>
             ) : (
               <div className="space-y-2">
                 {guardOps.map((op) => (
                   <div key={op.id} className="bg-muted/40 rounded-xl px-4 py-3">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${OP_COLORS[op.type]}`}>
-                          {OP_ICONS[op.type]}
-                          {op.type}
-                        </span>
-                      </div>
-                      <span className="text-xs text-muted-foreground flex-shrink-0">
-                        {formatDate(op.date)}
+                      <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${OP_COLORS[op.type]}`}>
+                        {OP_ICONS[op.type]}
+                        {op.type}
                       </span>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">{formatDate(op.date)}</span>
                     </div>
                     <p className="text-sm text-foreground mt-1.5">{opSummary(op)}</p>
-                    {op.notes && (
-                      <p className="text-xs text-muted-foreground mt-1">ملاحظة: {op.notes}</p>
-                    )}
+                    {op.notes && <p className="text-xs text-muted-foreground mt-1">ملاحظة: {op.notes}</p>}
                   </div>
                 ))}
               </div>

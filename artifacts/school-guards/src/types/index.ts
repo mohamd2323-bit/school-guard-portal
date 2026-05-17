@@ -89,6 +89,34 @@ export interface Operation {
   details: Record<string, string>;
 }
 
+export type ViolationStatus = "جديد" | "تحت الإجراء" | "مغلق";
+export type ViolationType = "شكوى" | "ملاحظة" | "بلاغ" | "مخالفة" | "أخرى";
+export type ReporterSource =
+  | "مدير مدرسة"
+  | "ولي أمر"
+  | "مشرف"
+  | "جهة حكومية"
+  | "أخرى";
+
+export interface Violation {
+  id: string;
+  caseNumber: string;
+  type: ViolationType;
+  reporterName: string;
+  reporterSource: ReporterSource;
+  schoolId: string | null;
+  schoolName: string;
+  governorate: string;
+  guardId: string | null;
+  guardName: string;
+  description: string;
+  reportDate: string;
+  status: ViolationStatus;
+  actionTaken: string;
+  notes: string;
+  createdAt: string;
+}
+
 export interface ImportSummary {
   guardsImported: number;
   schoolsImported: number;
@@ -103,4 +131,5 @@ export interface AppData {
   needs: Need[];
   tickets: Ticket[];
   operations: Operation[];
+  violations: Violation[];
 }
