@@ -71,6 +71,24 @@ export interface Ticket {
   createdAt: string;
 }
 
+export type OperationType =
+  | "نقل حارس"
+  | "إضافة حارس"
+  | "تكليف حارس"
+  | "بدل حارس"
+  | "تعديل بيانات";
+
+export interface Operation {
+  id: string;
+  type: OperationType;
+  guardId: string | null;
+  guardName: string;
+  date: string;
+  notes: string;
+  createdAt: string;
+  details: Record<string, string>;
+}
+
 export interface ImportSummary {
   guardsImported: number;
   schoolsImported: number;
@@ -84,4 +102,5 @@ export interface AppData {
   schools: School[];
   needs: Need[];
   tickets: Ticket[];
+  operations: Operation[];
 }

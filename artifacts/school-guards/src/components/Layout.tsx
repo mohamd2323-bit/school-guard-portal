@@ -6,6 +6,7 @@ import {
   Database,
   ClipboardList,
   Headphones,
+  Settings2,
   Menu,
   X,
 } from "lucide-react";
@@ -16,6 +17,7 @@ const navItems = [
   { href: "/guards", label: "إدارة الحراس", icon: ShieldCheck },
   { href: "/schools", label: "إدارة المدارس", icon: School },
   { href: "/needs", label: "الاحتياج", icon: ClipboardList },
+  { href: "/operations", label: "إدارة العمليات", icon: Settings2 },
   { href: "/tickets", label: "بلاغات الدعم الموحد", icon: Headphones },
   { href: "/data", label: "إدارة البيانات", icon: Database },
 ];
@@ -55,7 +57,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
+        <nav className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive =
