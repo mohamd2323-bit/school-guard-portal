@@ -659,7 +659,7 @@ function buildLetterHTML(l: LetterData): string {
     .identity-block {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 28px;
       flex: 1;
     }
 
@@ -667,10 +667,12 @@ function buildLetterHTML(l: LetterData): string {
       flex-shrink: 0;
       width: 90px;
       height: 90px;
+      margin-right: -8px;
     }
 
     .identity-text {
       text-align: right;
+      align-self: center;
     }
 
     .id-kingdom {
