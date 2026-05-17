@@ -8,6 +8,7 @@ import Needs from "./pages/Needs";
 import Tickets from "./pages/Tickets";
 import Operations from "./pages/Operations";
 import Violations from "./pages/Violations";
+import Users from "./pages/Users";
 
 function NotFound() {
   return (
@@ -29,6 +30,7 @@ function Router() {
         <Route path="/violations" component={Violations} />
         <Route path="/tickets" component={Tickets} />
         <Route path="/data" component={DataManagement} />
+        <Route path="/users" component={Users} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

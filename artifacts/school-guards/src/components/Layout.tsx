@@ -10,8 +10,12 @@ import {
   AlertTriangle,
   Menu,
   X,
+  Users,
+  LogIn,
+  Crown,
 } from "lucide-react";
 import { useState } from "react";
+import { useUsers } from "../store/useUsers";
 
 const navItems = [
   { href: "/", label: "لوحة التحكم", icon: LayoutDashboard },
@@ -22,11 +26,13 @@ const navItems = [
   { href: "/violations", label: "المخالفات", icon: AlertTriangle },
   { href: "/tickets", label: "بلاغات الدعم الموحد", icon: Headphones },
   { href: "/data", label: "إدارة البيانات", icon: Database },
+  { href: "/users", label: "صلاحيات الموظفين", icon: Users },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { currentUser, logout } = useUsers();
 
   return (
     <div className="flex min-h-screen bg-background" dir="rtl">
@@ -77,9 +83,34 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Footer */}
-        <div className="px-5 py-4 border-t border-white/10">
-          <p className="text-white/40 text-xs text-center">نظام إدارة الحراسات المدرسية</p>
+        {/* Footer — current user widget */}
+        <div className="px-4 py-4 border-t border-white/10 space-y-2">
+          {currentUser ? (
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                  {currentUser.name.charAt(0)}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-white text-xs font-semibold truncate leading-tight">{currentUser.name}</p>
+                  <p className="text-white/60 text-[10px] leading-tight truncate">{currentUser.role}</p>
+                </div>
+              </div>
+              <button onClick={logout}
+                title="تسجيل خروج"
+                className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition-colors flex-shrink-0">
+                <LogIn className="w-3.5 h-3.5 rotate-180" />
+              </button>
+            </div>
+          ) : (
+            <Link href="/users"
+              className="flex items-center gap-2 text-white/60 hover:text-white text-xs transition-colors"
+              onClick={() => setMobileOpen(false)}>
+              <Crown className="w-3.5 h-3.5" />
+              تسجيل الدخول
+            </Link>
+          )}
+          <p className="text-white/30 text-[10px] text-center pt-1">نظام إدارة الحراسات المدرسية</p>
         </div>
       </aside>
 
