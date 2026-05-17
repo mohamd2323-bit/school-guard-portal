@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useStore } from "../store/useStore";
+import { useUsers } from "../store/useUsers";
 import type { Guard, School, Operation, OperationType } from "../types";
 import {
   ArrowLeftRight,
@@ -19,6 +20,9 @@ import {
   Copy,
   Check,
   FileText,
+  Filter,
+  FileSpreadsheet,
+  User2,
 } from "lucide-react";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -46,34 +50,60 @@ function makeOp(
   guardName: string,
   date: string,
   notes: string,
-  details: Record<string, string>
+  details: Record<string, string>,
+  performedBy = "النظام"
 ): Operation {
-  return { id: genId(), type, guardId, guardName, date, notes, createdAt: new Date().toISOString(), details };
+  return { id: genId(), type, guardId, guardName, date, notes, createdAt: new Date().toISOString(), details, performedBy };
 }
 
 // ─── OP meta ─────────────────────────────────────────────────────────────────
 
 const OP_COLORS: Record<OperationType, string> = {
-  "نقل حارس": "bg-indigo-100 text-indigo-800",
-  "إضافة حارس": "bg-green-100 text-green-800",
-  "تكليف حارس": "bg-amber-100 text-amber-800",
-  "بدل حارس": "bg-teal-100 text-teal-800",
+  "نقل حارس":     "bg-indigo-100 text-indigo-800",
+  "إضافة حارس":   "bg-green-100 text-green-800",
+  "تكليف حارس":   "bg-amber-100 text-amber-800",
+  "بدل حارس":     "bg-teal-100 text-teal-800",
   "تعديل بيانات": "bg-purple-100 text-purple-800",
+  "إلغاء تكليف":  "bg-rose-100 text-rose-800",
+  "إنهاء نقل":    "bg-orange-100 text-orange-800",
+  "أخرى":         "bg-gray-100 text-gray-700",
 };
+
+const OP_ICON: Record<OperationType, React.ReactNode> = {
+  "نقل حارس":     <ArrowLeftRight className="w-3 h-3" />,
+  "إضافة حارس":   <UserPlus className="w-3 h-3" />,
+  "تكليف حارس":   <Briefcase className="w-3 h-3" />,
+  "بدل حارس":     <Wallet className="w-3 h-3" />,
+  "تعديل بيانات": <Pencil className="w-3 h-3" />,
+  "إلغاء تكليف":  <X className="w-3 h-3" />,
+  "إنهاء نقل":    <ArrowLeftRight className="w-3 h-3" />,
+  "أخرى":         <Settings2 className="w-3 h-3" />,
+};
+
+const ALL_OP_TYPES: OperationType[] = [
+  "نقل حارس", "تكليف حارس", "بدل حارس", "تعديل بيانات",
+  "إضافة حارس", "إلغاء تكليف", "إنهاء نقل", "أخرى",
+];
 
 function opSummary(op: Operation): string {
   const d = op.details;
   switch (op.type) {
     case "نقل حارس":
       return `من "${d.fromSchoolName || "—"}" إلى "${d.toSchoolName || "—"}"`;
+    case "إنهاء نقل":
+      return `إنهاء نقل من "${d.fromSchoolName || "—"}" إلى "${d.toSchoolName || "—"}"`;
     case "إضافة حارس":
       return `مدرسة: ${d.schoolName || "—"} — محافظة: ${d.governorate || "—"}`;
     case "تكليف حارس":
       return `${d.entity || "—"} (${d.startDate || ""}–${d.endDate || ""})`;
+    case "إلغاء تكليف":
+      return `إلغاء تكليف: ${d.entity || "—"}`;
     case "بدل حارس":
       return `حالة البدل: ${d.allowanceStatus || "—"}`;
     case "تعديل بيانات":
       return d.summary || "تعديل البيانات الأساسية";
+    case "أخرى":
+      return d.summary || op.notes || "عملية أخرى";
     default:
       return "";
   }
@@ -303,6 +333,7 @@ function SubmitRow({ onClose, label = "حفظ العملية" }: { onClose: () =
 
 function TransferModal({ guards, schools, onClose }: { guards: Guard[]; schools: School[]; onClose: () => void }) {
   const { updateGuard } = useStore();
+  const { currentUser } = useUsers();
   const [guard, setGuard] = useState<Guard | null>(null);
   const [toSchool, setToSchool] = useState<School | null>(null);
   const [reason, setReason] = useState("");
@@ -323,7 +354,7 @@ function TransferModal({ guards, schools, onClose }: { guards: Guard[]; schools:
       toSchoolName: toSchool.name,
       toSchoolId: toSchool.id,
       reason,
-    });
+    }, currentUser?.name ?? "النظام");
     updateGuard(guard.id, { schoolId: toSchool.id, schoolName: toSchool.name, governorate: toSchool.governorate }, op);
     onClose();
   }
@@ -388,6 +419,7 @@ function TransferModal({ guards, schools, onClose }: { guards: Guard[]; schools:
 
 function AddGuardModal({ schools, onClose }: { schools: School[]; onClose: () => void }) {
   const { addGuard } = useStore();
+  const { currentUser } = useUsers();
   const [name, setName] = useState("");
   const [nationalId, setNationalId] = useState("");
   const [phone, setPhone] = useState("");
@@ -429,7 +461,7 @@ function AddGuardModal({ schools, onClose }: { schools: School[]; onClose: () =>
       governorate: governorate.trim(),
       gender,
       jobTitle: jobTitle.trim(),
-    });
+    }, currentUser?.name ?? "النظام");
     addGuard(newGuard, op);
     onClose();
   }
@@ -1029,6 +1061,7 @@ function openLetterWindow(html: string, autoPrint = false) {
 
 function AssignmentModal({ guards, onClose }: { guards: Guard[]; onClose: () => void }) {
   const { addOperation } = useStore();
+  const { currentUser } = useUsers();
 
   const [phase, setPhase] = useState<"form" | "letter">("form");
   const [letterData, setLetterData] = useState<LetterData | null>(null);
@@ -1056,7 +1089,7 @@ function AssignmentModal({ guards, onClose }: { guards: Guard[]; onClose: () => 
       startDate,
       endDate,
       reason: reason.trim(),
-    });
+    }, currentUser?.name ?? "النظام");
     addOperation(op);
 
     const ld: LetterData = {
@@ -1331,6 +1364,7 @@ const ALLOWANCE_STATUSES = ["ممنوح", "موقوف", "مستحق", "تحت ا
 
 function AllowanceModal({ guards, onClose }: { guards: Guard[]; onClose: () => void }) {
   const { addOperation } = useStore();
+  const { currentUser } = useUsers();
   const [guard, setGuard] = useState<Guard | null>(null);
   const [allowanceStatus, setAllowanceStatus] = useState(ALLOWANCE_STATUSES[0]);
   const [date, setDate] = useState(todayStr());
@@ -1342,7 +1376,7 @@ function AllowanceModal({ guards, onClose }: { guards: Guard[]; onClose: () => v
     if (!guard) { setError("يرجى اختيار الحارس"); return; }
     setError("");
 
-    const op = makeOp("بدل حارس", guard.id, guard.name, date, notes, { allowanceStatus });
+    const op = makeOp("بدل حارس", guard.id, guard.name, date, notes, { allowanceStatus }, currentUser?.name ?? "النظام");
     addOperation(op);
     onClose();
   }
@@ -1400,6 +1434,7 @@ function AllowanceModal({ guards, onClose }: { guards: Guard[]; onClose: () => v
 
 function EditGuardModal({ guards, schools, onClose }: { guards: Guard[]; schools: School[]; onClose: () => void }) {
   const { updateGuard } = useStore();
+  const { currentUser } = useUsers();
   const [guard, setGuard] = useState<Guard | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -1458,7 +1493,7 @@ function EditGuardModal({ guards, schools, onClose }: { guards: Guard[]; schools
     };
     const op = makeOp("تعديل بيانات", guard.id, guard.name, todayStr(), notes, {
       summary: changes.length > 0 ? `تعديل: ${changes.join("، ")}` : "مراجعة البيانات",
-    });
+    }, currentUser?.name ?? "النظام");
     updateGuard(guard.id, patch, op);
     onClose();
   }
@@ -1604,17 +1639,177 @@ const CARDS: {
   },
 ];
 
+// ─── helpers for report export ────────────────────────────────────────────────
+
+function buildReportHTML(ops: Operation[], filterLabel: string): string {
+  const rows = ops.map((op) => `
+    <tr>
+      <td>${op.type}</td>
+      <td>${op.guardName}</td>
+      <td>${opSummary(op)}</td>
+      <td>${op.performedBy || "—"}</td>
+      <td>${op.date}</td>
+      <td>${op.notes || "—"}</td>
+    </tr>`).join("");
+
+  return `<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>تقرير سجل العمليات</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    @page { size: A4 landscape; margin: 1.5cm; }
+    body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; font-size: 11.5px; color: #1a1a1a; direction: rtl; }
+    .header { text-align: center; border-bottom: 3px double #1a7a6e; padding-bottom: 12px; margin-bottom: 14px; }
+    .header .kingdom { font-size: 11px; color: #666; }
+    .header h1 { font-size: 15px; color: #1a7a6e; font-weight: 900; margin: 4px 0 2px; }
+    .header .meta { font-size: 10.5px; color: #888; }
+    .filter-bar { background: #f4faf9; border: 1px solid #c8e6e0; border-radius: 6px; padding: 7px 14px; margin-bottom: 12px; font-size: 11px; color: #444; }
+    .stats-row { display: flex; gap: 14px; margin-bottom: 12px; }
+    .stat { background: #f4faf9; border: 1px solid #c8e6e0; border-radius: 6px; padding: 5px 14px; font-size: 11px; }
+    .stat strong { color: #1a7a6e; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #1a7a6e; color: #fff; padding: 7px 10px; text-align: right; font-size: 11px; font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    td { padding: 6px 10px; border-bottom: 1px solid #e5e7eb; font-size: 11px; vertical-align: top; }
+    tr:nth-child(even) td { background: #f9fafb; }
+    .footer { margin-top: 18px; border-top: 1px solid #e0e0e0; padding-top: 8px; display: flex; justify-content: space-between; font-size: 10px; color: #aaa; }
+    @media print { body { padding: 0; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <p class="kingdom">المملكة العربية السعودية — وزارة التعليم</p>
+    <h1>تقرير سجل العمليات — إدارة الأمن والسلامة — تعليم عسير</h1>
+    <p class="meta">تاريخ الإصدار: ${new Date().toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric" })}</p>
+  </div>
+  ${filterLabel ? `<div class="filter-bar">الفلاتر المطبقة: ${filterLabel}</div>` : ""}
+  <div class="stats-row">
+    <div class="stat">إجمالي العمليات: <strong>${ops.length}</strong></div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>نوع العملية</th>
+        <th>اسم الحارس</th>
+        <th>التفاصيل</th>
+        <th>تم بواسطة</th>
+        <th>تاريخ العملية</th>
+        <th>ملاحظات</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows || '<tr><td colspan="6" style="text-align:center;color:#888;padding:20px">لا توجد عمليات</td></tr>'}
+    </tbody>
+  </table>
+  <div class="footer">
+    <span>نظام إدارة الحراسات المدرسية — تعليم عسير</span>
+    <span>عدد السجلات: ${ops.length}</span>
+  </div>
+</body>
+</html>`;
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Operations() {
   const { guards, schools, operations } = useStore();
   const [activeModal, setActiveModal] = useState<ModalKey | null>(null);
 
-  const recentOps = operations.slice(0, 30);
+  // ── filter state ──
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [fType, setFType]         = useState("");
+  const [fEmployee, setFEmployee] = useState("");
+  const [fGuard, setFGuard]       = useState("");
+  const [fSchool, setFSchool]     = useState("");
+  const [fDateFrom, setFDateFrom] = useState("");
+  const [fDateTo, setFDateTo]     = useState("");
+
+  const activeFilterCount = [fType, fEmployee, fGuard, fSchool, fDateFrom, fDateTo].filter(Boolean).length;
+
+  function clearFilters() {
+    setFType(""); setFEmployee(""); setFGuard(""); setFSchool("");
+    setFDateFrom(""); setFDateTo("");
+  }
+
+  // ── dropdown options (dynamic from data) ──
+  const uniqueEmployees = useMemo(() => {
+    const s = new Set<string>();
+    operations.forEach((op) => { if (op.performedBy) s.add(op.performedBy); });
+    return Array.from(s).sort();
+  }, [operations]);
+
+  const uniqueGuards = useMemo(() => {
+    const s = new Set<string>();
+    operations.forEach((op) => { if (op.guardName) s.add(op.guardName); });
+    return Array.from(s).sort();
+  }, [operations]);
+
+  // ── filtered result ──
+  const filtered = useMemo(() => {
+    return operations.filter((op) => {
+      if (fType && op.type !== fType) return false;
+      if (fEmployee && op.performedBy !== fEmployee) return false;
+      if (fGuard && op.guardName !== fGuard) return false;
+      if (fSchool) {
+        const school =
+          op.details.toSchoolName || op.details.schoolName || op.details.entity || "";
+        if (!school.includes(fSchool)) return false;
+      }
+      if (fDateFrom && op.date < fDateFrom) return false;
+      if (fDateTo   && op.date > fDateTo)   return false;
+      return true;
+    });
+  }, [operations, fType, fEmployee, fGuard, fSchool, fDateFrom, fDateTo]);
+
+  // ── export helpers ──
+  function filterLabel() {
+    return [
+      fType     && `نوع العملية: ${fType}`,
+      fEmployee && `الموظف: ${fEmployee}`,
+      fGuard    && `الحارس: ${fGuard}`,
+      fSchool   && `المدرسة: ${fSchool}`,
+      fDateFrom && `من: ${fDateFrom}`,
+      fDateTo   && `إلى: ${fDateTo}`,
+    ].filter(Boolean).join(" | ");
+  }
+
+  function handlePrint() {
+    const win = window.open("", "_blank", "width=1150,height=780");
+    if (!win) return;
+    win.document.write(buildReportHTML(filtered, filterLabel()));
+    win.document.close();
+    win.onload = () => { win.focus(); win.print(); };
+  }
+
+  function handlePDF() {
+    const win = window.open("", "_blank", "width=1150,height=780");
+    if (!win) return;
+    win.document.write(buildReportHTML(filtered, filterLabel()));
+    win.document.close();
+    win.onload = () => { win.focus(); win.print(); };
+  }
+
+  function handleExcel() {
+    import("xlsx").then((XLSX) => {
+      const rows = filtered.map((op) => ({
+        "نوع العملية":  op.type,
+        "اسم الحارس":  op.guardName,
+        "التفاصيل":    opSummary(op),
+        "تم بواسطة":   op.performedBy || "—",
+        "تاريخ العملية": op.date,
+        "ملاحظات":     op.notes || "",
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "سجل العمليات");
+      XLSX.writeFile(wb, `operations-${todayStr()}.xlsx`);
+    });
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* ── Page header ── */}
       <div>
         <h2 className="text-xl font-bold text-foreground">إدارة العمليات</h2>
         <p className="text-muted-foreground text-sm mt-0.5">
@@ -1622,7 +1817,7 @@ export default function Operations() {
         </p>
       </div>
 
-      {/* Operation cards */}
+      {/* ── Operation cards ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {CARDS.map((card) => (
           <button
@@ -1639,23 +1834,155 @@ export default function Operations() {
         ))}
       </div>
 
-      {/* Recent operations */}
+      {/* ── Operations log ── */}
       <div>
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
-            <Clock className="w-4 h-4 text-muted-foreground" />
+
+        {/* Log title bar */}
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          {/* Title */}
+          <div className="flex items-center gap-2 ml-auto">
+            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+              <Clock className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <div>
+              <h3 className="font-bold text-foreground text-sm">سجل العمليات</h3>
+              <p className="text-muted-foreground text-xs">
+                {filtered.length} عملية
+                {activeFilterCount > 0 ? ` (مفلترة من ${operations.length})` : " مسجلة"}
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-bold text-foreground text-sm">العمليات الأخيرة</h3>
-            <p className="text-muted-foreground text-xs">آخر {Math.min(recentOps.length, 30)} عملية مسجلة</p>
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Filter toggle */}
+            <button
+              onClick={() => setFiltersOpen((v) => !v)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border transition-all
+                ${filtersOpen || activeFilterCount > 0
+                  ? "bg-primary text-white border-primary shadow-sm"
+                  : "bg-white border-border text-foreground hover:bg-muted/60"}`}
+            >
+              <Filter className="w-4 h-4" />
+              فلترة
+              {activeFilterCount > 0 && (
+                <span className="bg-white text-primary rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+
+            {/* Export — only when data exists */}
+            {operations.length > 0 && (
+              <>
+                <button onClick={handlePrint}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border border-border bg-white text-foreground hover:bg-muted/60 transition-colors">
+                  <Printer className="w-4 h-4" />
+                  طباعة العمليات
+                </button>
+                <button onClick={handleExcel}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border border-green-300 bg-green-50 text-green-700 hover:bg-green-100 transition-colors">
+                  <FileSpreadsheet className="w-4 h-4" />
+                  تصدير Excel
+                </button>
+                <button onClick={handlePDF}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors">
+                  <FileDown className="w-4 h-4" />
+                  تصدير PDF
+                </button>
+              </>
+            )}
           </div>
-          {operations.length > 0 && (
-            <span className="mr-auto text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-medium">
-              الإجمالي: {operations.length}
-            </span>
-          )}
         </div>
 
+        {/* ── Filters panel ── */}
+        {filtersOpen && (
+          <div className="bg-muted/30 border border-border rounded-xl p-4 mb-4 space-y-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+
+              {/* نوع العملية */}
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">نوع العملية</label>
+                <div className="relative">
+                  <select value={fType} onChange={(e) => setFType(e.target.value)}
+                    className="w-full appearance-none px-3 py-2 rounded-lg border border-border text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30">
+                    <option value="">الكل</option>
+                    {ALL_OP_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <ChevronDown className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                </div>
+              </div>
+
+              {/* الموظف المنفذ */}
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">الموظف المنفذ</label>
+                <div className="relative">
+                  <select value={fEmployee} onChange={(e) => setFEmployee(e.target.value)}
+                    className="w-full appearance-none px-3 py-2 rounded-lg border border-border text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30">
+                    <option value="">الكل</option>
+                    {uniqueEmployees.map((e) => <option key={e} value={e}>{e}</option>)}
+                  </select>
+                  <ChevronDown className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                </div>
+              </div>
+
+              {/* الحارس */}
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">الحارس</label>
+                <div className="relative">
+                  <select value={fGuard} onChange={(e) => setFGuard(e.target.value)}
+                    className="w-full appearance-none px-3 py-2 rounded-lg border border-border text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30">
+                    <option value="">الكل</option>
+                    {uniqueGuards.map((g) => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                  <ChevronDown className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                </div>
+              </div>
+
+              {/* المدرسة */}
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">المدرسة / الجهة</label>
+                <input type="text" value={fSchool} onChange={(e) => setFSchool(e.target.value)}
+                  placeholder="اكتب للبحث..."
+                  className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30" />
+              </div>
+
+              {/* التاريخ من */}
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">التاريخ من</label>
+                <input type="date" value={fDateFrom} onChange={(e) => setFDateFrom(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30" />
+              </div>
+
+              {/* التاريخ إلى */}
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">التاريخ إلى</label>
+                <input type="date" value={fDateTo} onChange={(e) => setFDateTo(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30" />
+              </div>
+            </div>
+
+            {/* Filter summary + clear */}
+            {activeFilterCount > 0 && (
+              <div className="flex items-center justify-between pt-2 border-t border-border">
+                <p className="text-xs text-muted-foreground">
+                  يعرض{" "}
+                  <span className="font-bold text-foreground">{filtered.length}</span>
+                  {" "}من أصل{" "}
+                  <span className="font-bold text-foreground">{operations.length}</span>
+                  {" "}عملية
+                </p>
+                <button onClick={clearFilters}
+                  className="flex items-center gap-1.5 text-xs text-rose-600 hover:text-rose-700 font-semibold transition-colors">
+                  <X className="w-3.5 h-3.5" />
+                  مسح الفلاتر
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Table ── */}
         <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
           {operations.length === 0 ? (
             <div className="py-16 text-center">
@@ -1665,6 +1992,14 @@ export default function Operations() {
               <p className="text-muted-foreground font-medium">لا توجد عمليات مسجلة بعد</p>
               <p className="text-muted-foreground text-sm mt-1">اختر عملية من البطاقات أعلاه للبدء</p>
             </div>
+          ) : filtered.length === 0 ? (
+            <div className="py-12 text-center">
+              <p className="text-muted-foreground font-medium">لا توجد نتائج تطابق الفلاتر المحددة</p>
+              <button onClick={clearFilters}
+                className="mt-2 text-sm text-primary hover:underline font-medium">
+                مسح الفلاتر
+              </button>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="data-table">
@@ -1673,26 +2008,29 @@ export default function Operations() {
                     <th>نوع العملية</th>
                     <th>اسم الحارس</th>
                     <th>التفاصيل</th>
+                    <th>تم بواسطة</th>
                     <th>تاريخ العملية</th>
                     <th>ملاحظات</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {recentOps.map((op) => (
+                  {filtered.map((op) => (
                     <tr key={op.id}>
                       <td>
-                        <span className={`badge flex items-center gap-1.5 w-fit ${OP_COLORS[op.type]}`}>
-                          {op.type === "نقل حارس" && <ArrowLeftRight className="w-3 h-3" />}
-                          {op.type === "إضافة حارس" && <UserPlus className="w-3 h-3" />}
-                          {op.type === "تكليف حارس" && <Briefcase className="w-3 h-3" />}
-                          {op.type === "بدل حارس" && <Wallet className="w-3 h-3" />}
-                          {op.type === "تعديل بيانات" && <Pencil className="w-3 h-3" />}
+                        <span className={`badge flex items-center gap-1.5 w-fit ${OP_COLORS[op.type] ?? "bg-gray-100 text-gray-700"}`}>
+                          {OP_ICON[op.type]}
                           {op.type}
                         </span>
                       </td>
                       <td className="font-medium text-foreground">{op.guardName}</td>
                       <td>
                         <p className="text-sm text-foreground max-w-56 line-clamp-2">{opSummary(op)}</p>
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                          <User2 className="w-3.5 h-3.5 flex-shrink-0 text-primary/50" />
+                          <span className="font-medium text-foreground">{op.performedBy || "—"}</span>
+                        </div>
                       </td>
                       <td>
                         <div className="flex items-center gap-1.5 text-sm">
@@ -1714,7 +2052,7 @@ export default function Operations() {
         </div>
       </div>
 
-      {/* Modals */}
+      {/* ── Modals ── */}
       {activeModal === "transfer" && (
         <TransferModal guards={guards} schools={schools} onClose={() => setActiveModal(null)} />
       )}

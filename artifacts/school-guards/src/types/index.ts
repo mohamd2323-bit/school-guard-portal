@@ -76,7 +76,10 @@ export type OperationType =
   | "إضافة حارس"
   | "تكليف حارس"
   | "بدل حارس"
-  | "تعديل بيانات";
+  | "تعديل بيانات"
+  | "إلغاء تكليف"
+  | "إنهاء نقل"
+  | "أخرى";
 
 export interface Operation {
   id: string;
@@ -87,6 +90,7 @@ export interface Operation {
   notes: string;
   createdAt: string;
   details: Record<string, string>;
+  performedBy?: string;
 }
 
 export type ViolationStatus = "جديد" | "تحت الإجراء" | "مغلق";
