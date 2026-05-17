@@ -13,6 +13,12 @@ import {
   Calendar,
   Settings2,
   Clock,
+  Eye,
+  Printer,
+  FileDown,
+  Copy,
+  Check,
+  FileText,
 } from "lucide-react";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -517,10 +523,295 @@ function AddGuardModal({ schools, onClose }: { schools: School[]; onClose: () =>
 
 // ─── 3. Assignment modal ──────────────────────────────────────────────────────
 
+type EntityType = "مدرسة" | "مبنى إداري" | "فعالية" | "نشاط" | "جهة أخرى";
+const ENTITY_TYPES: EntityType[] = ["مدرسة", "مبنى إداري", "فعالية", "نشاط", "جهة أخرى"];
+
+interface LetterData {
+  guardName: string;
+  nationalId: string;
+  jobTitle: string;
+  currentSchool: string;
+  entity: string;
+  entityType: EntityType;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  notes: string;
+  refNumber: string;
+  issueDate: string;
+}
+
+function genRef() {
+  const y = new Date().getFullYear();
+  const n = Math.floor(1000 + Math.random() * 9000);
+  return `${n}/${y}`;
+}
+
+function formatDateAr(d: string) {
+  if (!d) return "—";
+  try {
+    return new Date(d).toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric", calendar: "gregory" });
+  } catch { return d; }
+}
+
+function buildLetterHTML(l: LetterData): string {
+  const endLine = l.endDate
+    ? `وحتى تاريخ ${formatDateAr(l.endDate)}`
+    : "حتى إشعار آخر";
+
+  return `<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>خطاب تكليف — ${l.guardName}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    @page { size: A4; margin: 2cm 2.5cm; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+      font-size: 14px;
+      color: #1a1a1a;
+      direction: rtl;
+      line-height: 1.9;
+      background: #fff;
+    }
+    .page { max-width: 720px; margin: 0 auto; padding: 40px; }
+    .letterhead {
+      text-align: center;
+      border-bottom: 3px double #1a7a6e;
+      padding-bottom: 18px;
+      margin-bottom: 28px;
+    }
+    .kingdom { font-size: 13px; color: #444; letter-spacing: 1px; }
+    .ministry { font-size: 18px; font-weight: bold; color: #1a7a6e; margin: 6px 0 2px; }
+    .dept { font-size: 13px; color: #666; }
+    .meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #555;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 10px 16px;
+      margin-bottom: 24px;
+      background: #f9f9f9;
+    }
+    .meta span { font-weight: 600; color: #1a7a6e; }
+    .recipient {
+      border-right: 4px solid #1a7a6e;
+      padding-right: 14px;
+      margin-bottom: 22px;
+      background: #f5fdfb;
+      border-radius: 0 8px 8px 0;
+      padding: 12px 16px 12px 12px;
+    }
+    .recipient p { font-size: 13px; color: #555; margin: 2px 0; }
+    .recipient .name { font-size: 16px; font-weight: bold; color: #1a1a1a; }
+    .subject {
+      font-size: 15px;
+      font-weight: bold;
+      text-align: center;
+      color: #1a7a6e;
+      border: 1px solid #b2dfdb;
+      border-radius: 8px;
+      padding: 8px 16px;
+      margin-bottom: 22px;
+      background: #e8f5e9;
+    }
+    .salutation { margin-bottom: 16px; font-size: 14px; }
+    .body { font-size: 14px; text-align: justify; margin-bottom: 20px; line-height: 2; }
+    .highlight {
+      display: inline-block;
+      font-weight: bold;
+      color: #0f5e57;
+      border-bottom: 2px solid #1a7a6e;
+      padding: 0 3px;
+    }
+    .reason-box {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin: 14px 0;
+      font-size: 13px;
+    }
+    .reason-box strong { color: #166534; }
+    .notes-box {
+      background: #fefce8;
+      border: 1px solid #fde68a;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin: 10px 0;
+      font-size: 13px;
+      color: #78350f;
+    }
+    .closing { margin-top: 24px; font-size: 14px; }
+    .signature {
+      margin-top: 48px;
+      text-align: center;
+    }
+    .sig-title { font-size: 14px; font-weight: bold; color: #1a7a6e; }
+    .sig-dept { font-size: 13px; color: #555; margin-top: 4px; }
+    .sig-line {
+      margin: 40px auto 8px;
+      width: 200px;
+      border-bottom: 1.5px solid #1a7a6e;
+    }
+    .sig-stamp {
+      display: inline-block;
+      border: 2px dashed #1a7a6e;
+      color: #1a7a6e;
+      border-radius: 50%;
+      width: 100px;
+      height: 100px;
+      line-height: 100px;
+      text-align: center;
+      font-size: 11px;
+      margin-top: 24px;
+      opacity: 0.35;
+    }
+    .footer {
+      margin-top: 48px;
+      border-top: 1px solid #e0e0e0;
+      padding-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #aaa;
+    }
+    @media print { body { padding: 0; } .page { padding: 0; } }
+  </style>
+</head>
+<body>
+<div class="page">
+  <div class="letterhead">
+    <p class="kingdom">المملكة العربية السعودية</p>
+    <p class="ministry">وزارة التعليم</p>
+    <p class="dept">إدارة الأمن والسلامة والمرافق &nbsp;|&nbsp; الأمن المدرسي — تعليم عسير</p>
+  </div>
+
+  <div class="meta">
+    <div>رقم الخطاب: <span>${l.refNumber}</span></div>
+    <div>التاريخ: <span>${formatDateAr(l.issueDate)}</span></div>
+  </div>
+
+  <div class="recipient">
+    <p>إلى السيد / السيدة</p>
+    <p class="name">${l.guardName}</p>
+    <p>السجل المدني: <strong>${l.nationalId}</strong></p>
+    <p>المسمى الوظيفي: <strong>${l.jobTitle || "—"}</strong></p>
+    <p>جهة العمل الحالية: <strong>${l.currentSchool}</strong></p>
+  </div>
+
+  <div class="subject">خطاب تكليف</div>
+
+  <p class="salutation">السلام عليكم ورحمة الله وبركاته،</p>
+
+  <div class="body">
+    <p>
+      نفيدكم بأنه تقرر تكليفكم بالعمل في
+      <span class="highlight">${l.entityType}: ${l.entity}</span>،
+      وذلك اعتباراً من تاريخ
+      <span class="highlight">${formatDateAr(l.startDate)}</span>
+      ${endLine}.
+    </p>
+  </div>
+
+  ${l.reason ? `<div class="reason-box"><strong>سبب التكليف:</strong> ${l.reason}</div>` : ""}
+
+  <div class="body">
+    <p>
+      لذا يُرجى الانتقال إلى الجهة المذكورة في التاريخ المحدد،
+      والالتزام بجميع تعليمات العمل والأنظمة واللوائح المعمول بها.
+    </p>
+  </div>
+
+  ${l.notes ? `<div class="notes-box">ملاحظات: ${l.notes}</div>` : ""}
+
+  <p class="closing">وتفضلوا بقبول وافر التحية والاحترام.</p>
+
+  <div class="signature">
+    <div class="sig-title">مدير الأمن والسلامة والمرافق</div>
+    <div class="sig-dept">إدارة تعليم عسير</div>
+    <div class="sig-line"></div>
+    <div style="font-size:12px;color:#888;">التوقيع</div>
+    <div class="sig-stamp">الختم الرسمي</div>
+  </div>
+
+  <div class="footer">
+    <span>نظام إدارة الحراسات المدرسية — تعليم عسير</span>
+    <span>رقم المرجع: ${l.refNumber}</span>
+  </div>
+</div>
+</body>
+</html>`;
+}
+
+function buildLetterText(l: LetterData): string {
+  const endLine = l.endDate ? `وحتى تاريخ ${formatDateAr(l.endDate)}` : "حتى إشعار آخر";
+  return [
+    "════════════════════════════════════════",
+    "         خطاب تكليف رسمي",
+    "════════════════════════════════════════",
+    "",
+    "المملكة العربية السعودية — وزارة التعليم",
+    "إدارة الأمن والسلامة والمرافق | الأمن المدرسي — تعليم عسير",
+    "",
+    `رقم الخطاب: ${l.refNumber}`,
+    `التاريخ: ${formatDateAr(l.issueDate)}`,
+    "",
+    "────────────────────────────────────────",
+    `إلى السيد / السيدة: ${l.guardName}`,
+    `السجل المدني: ${l.nationalId}`,
+    `المسمى الوظيفي: ${l.jobTitle || "—"}`,
+    `جهة العمل الحالية: ${l.currentSchool}`,
+    "────────────────────────────────────────",
+    "",
+    "الموضوع: خطاب تكليف",
+    "",
+    "السلام عليكم ورحمة الله وبركاته،",
+    "",
+    `نفيدكم بأنه تقرر تكليفكم بالعمل في ${l.entityType}: ${l.entity}،`,
+    `وذلك اعتباراً من تاريخ ${formatDateAr(l.startDate)} ${endLine}.`,
+    "",
+    l.reason ? `سبب التكليف: ${l.reason}` : "",
+    "",
+    "لذا يُرجى الانتقال إلى الجهة المذكورة في التاريخ المحدد،",
+    "والالتزام بجميع تعليمات العمل والأنظمة واللوائح المعمول بها.",
+    "",
+    l.notes ? `ملاحظات: ${l.notes}` : "",
+    "",
+    "وتفضلوا بقبول وافر التحية والاحترام،",
+    "",
+    "مدير الأمن والسلامة والمرافق",
+    "إدارة تعليم عسير",
+    "",
+    "التوقيع: ___________________",
+    "",
+    "════════════════════════════════════════",
+  ].filter((l) => l !== undefined).join("\n");
+}
+
+function openLetterWindow(html: string, autoPrint = false) {
+  const win = window.open("", "_blank", "width=900,height=750");
+  if (!win) return;
+  win.document.write(html);
+  win.document.close();
+  if (autoPrint) {
+    win.onload = () => { win.focus(); win.print(); };
+  }
+}
+
 function AssignmentModal({ guards, onClose }: { guards: Guard[]; onClose: () => void }) {
   const { addOperation } = useStore();
+
+  const [phase, setPhase] = useState<"form" | "letter">("form");
+  const [letterData, setLetterData] = useState<LetterData | null>(null);
+  const [copied, setCopied] = useState(false);
+
   const [guard, setGuard] = useState<Guard | null>(null);
   const [entity, setEntity] = useState("");
+  const [entityType, setEntityType] = useState<EntityType>("مدرسة");
   const [startDate, setStartDate] = useState(todayStr());
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
@@ -530,22 +821,193 @@ function AssignmentModal({ guards, onClose }: { guards: Guard[]; onClose: () => 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!guard) { setError("يرجى اختيار الحارس"); return; }
-    if (!entity.trim()) { setError("يرجى إدخال جهة التكليف"); return; }
+    if (!entity.trim()) { setError("يرجى إدخال الجهة المكلف بها"); return; }
     if (!startDate) { setError("يرجى تحديد تاريخ البداية"); return; }
     setError("");
 
     const op = makeOp("تكليف حارس", guard.id, guard.name, startDate, notes, {
       entity: entity.trim(),
+      entityType,
       startDate,
       endDate,
       reason: reason.trim(),
     });
     addOperation(op);
-    onClose();
+
+    const ld: LetterData = {
+      guardName: guard.name,
+      nationalId: guard.nationalId,
+      jobTitle: guard.jobTitle || guard.jobType || "",
+      currentSchool: guard.schoolName || "—",
+      entity: entity.trim(),
+      entityType,
+      startDate,
+      endDate,
+      reason: reason.trim(),
+      notes: notes.trim(),
+      refNumber: genRef(),
+      issueDate: todayStr(),
+    };
+    setLetterData(ld);
+    setPhase("letter");
+  }
+
+  function handleCopy() {
+    if (!letterData) return;
+    navigator.clipboard.writeText(buildLetterText(letterData)).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  const letterHTML = letterData ? buildLetterHTML(letterData) : "";
+
+  if (phase === "letter" && letterData) {
+    return (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" dir="rtl">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 rounded-t-2xl flex-shrink-0"
+            style={{ background: "hsl(174 65% 28%)" }}>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-white font-bold text-sm">خطاب التكليف</h2>
+                <p className="text-white/70 text-xs">{letterData.guardName} — رقم {letterData.refNumber}</p>
+              </div>
+            </div>
+            <button onClick={onClose}
+              className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Letter preview */}
+          <div className="overflow-y-auto flex-1 p-6">
+            <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+              {/* Letterhead preview */}
+              <div className="text-center py-5 px-6 border-b-2 border-double"
+                style={{ borderColor: "#1a7a6e" }}>
+                <p className="text-xs text-muted-foreground">المملكة العربية السعودية</p>
+                <p className="text-base font-bold mt-0.5" style={{ color: "#1a7a6e" }}>وزارة التعليم</p>
+                <p className="text-xs text-muted-foreground">إدارة الأمن والسلامة والمرافق | الأمن المدرسي — تعليم عسير</p>
+              </div>
+
+              <div className="p-6 space-y-4 text-sm leading-relaxed" style={{ fontFamily: "serif" }}>
+                {/* Meta */}
+                <div className="flex justify-between text-xs bg-muted/40 rounded-lg px-4 py-2.5 border border-border">
+                  <span>رقم الخطاب: <span className="font-bold text-primary">{letterData.refNumber}</span></span>
+                  <span>التاريخ: <span className="font-bold text-primary">{formatDateAr(letterData.issueDate)}</span></span>
+                </div>
+
+                {/* Recipient */}
+                <div className="border-r-4 border-primary bg-primary/5 rounded-l-lg pr-4 pl-3 py-3">
+                  <p className="text-muted-foreground text-xs">إلى السيد / السيدة</p>
+                  <p className="font-bold text-base text-foreground mt-0.5">{letterData.guardName}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    السجل المدني: <span className="font-mono font-semibold text-foreground">{letterData.nationalId}</span>
+                    &ensp;|&ensp; {letterData.jobTitle || "—"}
+                    &ensp;|&ensp; {letterData.currentSchool}
+                  </p>
+                </div>
+
+                {/* Subject */}
+                <div className="text-center font-bold text-primary border border-primary/30 rounded-lg py-2 bg-primary/5">
+                  الموضوع: خطاب تكليف
+                </div>
+
+                <p className="text-muted-foreground text-xs">السلام عليكم ورحمة الله وبركاته،</p>
+
+                <p className="leading-8">
+                  نفيدكم بأنه تقرر تكليفكم بالعمل في{" "}
+                  <span className="font-bold text-primary border-b border-primary">
+                    {letterData.entityType}: {letterData.entity}
+                  </span>
+                  ، وذلك اعتباراً من تاريخ{" "}
+                  <span className="font-bold">{formatDateAr(letterData.startDate)}</span>
+                  {letterData.endDate
+                    ? <> وحتى تاريخ <span className="font-bold">{formatDateAr(letterData.endDate)}</span></>
+                    : " حتى إشعار آخر"
+                  }.
+                </p>
+
+                {letterData.reason && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-sm">
+                    <span className="font-semibold text-green-800">سبب التكليف: </span>
+                    <span className="text-green-900">{letterData.reason}</span>
+                  </div>
+                )}
+
+                <p className="leading-8">
+                  لذا يُرجى الانتقال إلى الجهة المذكورة في التاريخ المحدد،
+                  والالتزام بجميع تعليمات العمل والأنظمة واللوائح المعمول بها.
+                </p>
+
+                {letterData.notes && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-xs text-amber-900">
+                    <span className="font-semibold">ملاحظات: </span>{letterData.notes}
+                  </div>
+                )}
+
+                <p className="mt-2">وتفضلوا بقبول وافر التحية والاحترام،</p>
+
+                {/* Signature */}
+                <div className="text-center mt-8 pt-4">
+                  <p className="font-bold text-sm" style={{ color: "#1a7a6e" }}>مدير الأمن والسلامة والمرافق</p>
+                  <p className="text-xs text-muted-foreground mt-1">إدارة تعليم عسير</p>
+                  <div className="mt-8 mx-auto w-40 border-b border-foreground/40"></div>
+                  <p className="text-xs text-muted-foreground mt-1">التوقيع</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap items-center gap-2 px-6 py-4 border-t border-border flex-shrink-0 bg-white rounded-b-2xl">
+            <button onClick={() => openLetterWindow(letterHTML)}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+              <Eye className="w-4 h-4" />
+              معاينة الخطاب
+            </button>
+            <button onClick={() => openLetterWindow(letterHTML, true)}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold bg-primary text-white hover:bg-primary/90 transition-colors">
+              <Printer className="w-4 h-4" />
+              طباعة الخطاب
+            </button>
+            <button onClick={() => {
+              const win = window.open("", "_blank", "width=900,height=750");
+              if (!win) return;
+              win.document.write(letterHTML);
+              win.document.close();
+              win.onload = () => {
+                win.focus();
+                win.print();
+              };
+            }}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 transition-colors">
+              <FileDown className="w-4 h-4" />
+              تحميل PDF
+            </button>
+            <button onClick={handleCopy}
+              className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold border transition-colors
+                ${copied ? "bg-green-50 border-green-300 text-green-700" : "bg-white border-border text-foreground hover:bg-muted/60"}`}>
+              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copied ? "تم النسخ!" : "نسخ الخطاب"}
+            </button>
+            <button onClick={onClose}
+              className="mr-auto px-5 py-2.5 rounded-xl text-sm font-semibold bg-muted text-foreground hover:bg-muted/80 transition-colors">
+              إغلاق
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <Modal title="تكليف حارس من مدرسة إلى أخرى" icon={<Briefcase className="w-5 h-5" />} onClose={onClose}>
+    <Modal title="تكليف حارس" icon={<Briefcase className="w-5 h-5" />} onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <FieldLabel required>اختيار الحارس</FieldLabel>
@@ -553,27 +1015,54 @@ function AssignmentModal({ guards, onClose }: { guards: Guard[]; onClose: () => 
         </div>
 
         {guard && (
-          <div className="bg-muted/40 rounded-xl px-4 py-2.5 text-sm">
-            <span className="text-muted-foreground">مدرسته الحالية: </span>
-            <span className="font-medium">{guard.schoolName || "بدون مدرسة"}</span>
+          <div className="bg-muted/40 rounded-xl px-4 py-2.5 text-sm flex items-center gap-2">
+            <Briefcase className="w-4 h-4 text-primary flex-shrink-0" />
+            <div>
+              <span className="text-muted-foreground">جهة العمل الحالية: </span>
+              <span className="font-medium">{guard.schoolName || "بدون مدرسة"}</span>
+              {guard.jobTitle || guard.jobType
+                ? <span className="text-muted-foreground"> — {guard.jobTitle || guard.jobType}</span>
+                : null}
+            </div>
           </div>
         )}
 
         <div>
-          <FieldLabel required>جهة التكليف</FieldLabel>
+          <FieldLabel required>نوع الجهة المكلف بها</FieldLabel>
+          <div className="flex flex-wrap gap-2">
+            {ENTITY_TYPES.map((t) => (
+              <button key={t} type="button" onClick={() => setEntityType(t)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all
+                  ${entityType === t
+                    ? "border-primary bg-primary text-white"
+                    : "border-border text-foreground hover:border-primary/40"}`}>
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <FieldLabel required>الجهة المكلف بها</FieldLabel>
           <input type="text" value={entity} onChange={(e) => setEntity(e.target.value)}
-            placeholder="اسم الجهة التي يُكلَّف إليها الحارس"
+            placeholder={
+              entityType === "مدرسة" ? "اسم المدرسة..." :
+              entityType === "فعالية" ? "اسم الفعالية..." :
+              entityType === "نشاط" ? "اسم النشاط..." :
+              entityType === "مبنى إداري" ? "اسم المبنى الإداري..." :
+              "اسم الجهة..."
+            }
             className="w-full px-4 py-2.5 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <FieldLabel required>تاريخ البداية</FieldLabel>
+            <FieldLabel required>من تاريخ</FieldLabel>
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
               className="w-full px-3 py-2.5 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
           </div>
           <div>
-            <FieldLabel>تاريخ النهاية</FieldLabel>
+            <FieldLabel>إلى تاريخ</FieldLabel>
             <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
               className="w-full px-3 py-2.5 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
           </div>
@@ -594,7 +1083,18 @@ function AssignmentModal({ guards, onClose }: { guards: Guard[]; onClose: () => 
         </div>
 
         <ErrorBox msg={error} />
-        <SubmitRow onClose={onClose} label="تسجيل التكليف" />
+
+        <div className="flex gap-3 pt-2">
+          <button type="submit"
+            className="flex-1 bg-primary text-white py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
+            <FileText className="w-4 h-4" />
+            تسجيل التكليف وإنشاء الخطاب
+          </button>
+          <button type="button" onClick={onClose}
+            className="flex-1 bg-muted text-foreground py-2.5 rounded-xl text-sm font-semibold hover:bg-muted/80 transition-colors">
+            إلغاء
+          </button>
+        </div>
       </form>
     </Modal>
   );
