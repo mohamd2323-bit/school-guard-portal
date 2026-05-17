@@ -2,7 +2,8 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { useStore } from "../store/useStore";
 import {
   Search, School as SchoolIcon, FolderOpen, AlertTriangle,
-  UserPlus, Briefcase, ClipboardList, X, ChevronDown, Shield,
+  UserPlus, Briefcase, ClipboardList, X, Shield,
+  Plus, Pencil, Trash2,
 } from "lucide-react";
 import SchoolProfile from "../components/SchoolProfile";
 import type { School, Guard, Need, NeedType, Operation } from "../types";
@@ -375,6 +376,119 @@ function AddNeedModal({ school, onClose }: { school: School; onClose: () => void
   );
 }
 
+// ─── 4. إضافة / تعديل مدرسة modal ───────────────────────────────────────────
+
+const SCHOOL_TYPES: School["type"][] = ["بنين", "بنات", "مختلط"];
+
+function SchoolFormModal({
+  initial,
+  onSave,
+  onClose,
+}: {
+  initial?: School;
+  onSave: (data: Omit<School, "id" | "isDemo">) => void;
+  onClose: () => void;
+}) {
+  const isEdit = !!initial;
+  const [name, setName] = useState(initial?.name ?? "");
+  const [governorate, setGovernorate] = useState(initial?.governorate ?? "");
+  const [level, setLevel] = useState(initial?.level ?? "");
+  const [type, setType] = useState<School["type"]>(initial?.type ?? "بنين");
+  const [principalName, setPrincipalName] = useState(initial?.principalName ?? "");
+  const [principalNationalId, setPrincipalNationalId] = useState(initial?.principalNationalId ?? "");
+  const [principalPhone, setPrincipalPhone] = useState(initial?.principalPhone ?? "");
+  const [error, setError] = useState("");
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) { setError("اسم المدرسة مطلوب"); return; }
+    setError("");
+    onSave({ name: name.trim(), governorate: governorate.trim(), level: level.trim(), type, principalName: principalName.trim(), principalNationalId: principalNationalId.trim(), principalPhone: principalPhone.trim() });
+  }
+
+  const inputCls = "w-full px-4 py-2.5 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white";
+
+  return (
+    <ModalShell
+      title={isEdit ? "تعديل بيانات المدرسة" : "إضافة مدرسة جديدة"}
+      subtitle={isEdit ? initial?.name : undefined}
+      icon={<SchoolIcon className="w-4.5 h-4.5" />}
+      onClose={onClose}
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* School fields */}
+        <div className="bg-muted/30 rounded-xl p-4 space-y-3">
+          <p className="text-xs font-bold text-primary uppercase tracking-wide">بيانات المدرسة</p>
+          <div>
+            <FieldLabel required>اسم المدرسة</FieldLabel>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)}
+              placeholder="أدخل اسم المدرسة" className={inputCls} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <FieldLabel>المحافظة</FieldLabel>
+              <input type="text" value={governorate} onChange={(e) => setGovernorate(e.target.value)}
+                placeholder="المحافظة" className={inputCls} />
+            </div>
+            <div>
+              <FieldLabel>المرحلة</FieldLabel>
+              <input type="text" value={level} onChange={(e) => setLevel(e.target.value)}
+                placeholder="ابتدائي / متوسط / ثانوي" className={inputCls} />
+            </div>
+          </div>
+          <div>
+            <FieldLabel>النوع</FieldLabel>
+            <div className="flex gap-2">
+              {SCHOOL_TYPES.map((t) => (
+                <button key={t} type="button" onClick={() => setType(t)}
+                  className={`flex-1 py-2 rounded-xl text-sm font-semibold border-2 transition-all
+                    ${type === t ? "border-primary bg-primary text-white" : "border-border text-foreground hover:border-primary/40"}`}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Principal fields */}
+        <div className="bg-muted/30 rounded-xl p-4 space-y-3">
+          <p className="text-xs font-bold text-primary uppercase tracking-wide">بيانات المدير/ة</p>
+          <div>
+            <FieldLabel>اسم المدير/ة</FieldLabel>
+            <input type="text" value={principalName} onChange={(e) => setPrincipalName(e.target.value)}
+              placeholder="اسم المدير أو المديرة" className={inputCls} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <FieldLabel>سجل المدير/ة</FieldLabel>
+              <input type="text" value={principalNationalId} onChange={(e) => setPrincipalNationalId(e.target.value)}
+                placeholder="رقم الهوية الوطنية" className={inputCls} />
+            </div>
+            <div>
+              <FieldLabel>جوال المدير/ة</FieldLabel>
+              <input type="text" value={principalPhone} onChange={(e) => setPrincipalPhone(e.target.value)}
+                placeholder="05xxxxxxxx" className={inputCls} dir="ltr" />
+            </div>
+          </div>
+        </div>
+
+        {error && <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-sm text-red-700">{error}</div>}
+
+        <div className="flex gap-3 pt-1">
+          <button type="submit"
+            className="flex-1 bg-primary text-white py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors">
+            {isEdit ? "حفظ التعديلات" : "إضافة المدرسة"}
+          </button>
+          <button type="button" onClick={onClose}
+            className="flex-1 bg-muted text-foreground py-2.5 rounded-xl text-sm font-semibold hover:bg-muted/80 transition-colors">
+            إلغاء
+          </button>
+        </div>
+      </form>
+    </ModalShell>
+  );
+}
+
 // ─── Action menu for no-guard schools ────────────────────────────────────────
 
 type ActionModal = { type: "assign" | "temp" | "need"; school: School };
@@ -382,11 +496,13 @@ type ActionModal = { type: "assign" | "temp" | "need"; school: School };
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Schools() {
-  const { schools, guards } = useStore();
+  const { schools, guards, addSchool, updateSchool, deleteSchool } = useStore();
   const [search, setSearch] = useState("");
   const [guardFilter, setGuardFilter] = useState<GuardFilter>("all");
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [actionModal, setActionModal] = useState<ActionModal | null>(null);
+  const [formModal, setFormModal] = useState<{ mode: "add" } | { mode: "edit"; school: School } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<School | null>(null);
 
   const guardCountMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -425,6 +541,22 @@ export default function Schools() {
     { key: "has-guard", label: `مرتبطة بحارس (${schools.length - noGuardCount})` },
   ];
 
+  function handleSaveSchool(data: Omit<School, "id" | "isDemo">) {
+    if (formModal?.mode === "edit") {
+      updateSchool(formModal.school.id, data);
+    } else {
+      addSchool({ ...data, id: Math.random().toString(36).slice(2) + Date.now().toString(36) });
+    }
+    setFormModal(null);
+  }
+
+  function handleDelete() {
+    if (deleteTarget) {
+      deleteSchool(deleteTarget.id);
+      setDeleteTarget(null);
+    }
+  }
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -440,15 +572,24 @@ export default function Schools() {
             )}
           </p>
         </div>
-        <div className="relative">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="بحث..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pr-9 pl-4 py-2 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 w-56"
-          />
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="بحث..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pr-9 pl-4 py-2 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 w-52"
+            />
+          </div>
+          <button
+            onClick={() => setFormModal({ mode: "add" })}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-primary text-white hover:bg-primary/90 transition-colors whitespace-nowrap"
+          >
+            <Plus className="w-4 h-4" />
+            إضافة مدرسة
+          </button>
         </div>
       </div>
 
@@ -501,7 +642,9 @@ export default function Schools() {
             </div>
             <p className="text-muted-foreground font-medium">لا توجد بيانات حالياً</p>
             <p className="text-muted-foreground text-sm mt-1">
-              يرجى استيراد بيانات من{" "}
+              يمكنك{" "}
+              <button onClick={() => setFormModal({ mode: "add" })} className="text-primary hover:underline">إضافة مدرسة يدوياً</button>
+              {" "}أو استيراد بيانات من{" "}
               <a href="/data" className="text-primary hover:underline">إدارة البيانات</a>
             </p>
           </div>
@@ -583,6 +726,37 @@ export default function Schools() {
                       {/* Actions */}
                       <td>
                         <div className="flex items-center gap-1.5 flex-wrap">
+                          {/* ملف */}
+                          <button
+                            onClick={() => setSelectedSchool(school)}
+                            title="عرض ملف المدرسة"
+                            className="flex items-center gap-1 text-xs bg-muted text-muted-foreground hover:bg-muted/80 px-2 py-1.5 rounded-lg transition-colors font-medium"
+                          >
+                            <FolderOpen className="w-3.5 h-3.5" />
+                            ملف
+                          </button>
+
+                          {/* تعديل */}
+                          <button
+                            onClick={() => setFormModal({ mode: "edit", school })}
+                            title="تعديل بيانات المدرسة"
+                            className="flex items-center gap-1 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 px-2 py-1.5 rounded-lg transition-colors font-semibold"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                            تعديل
+                          </button>
+
+                          {/* حذف */}
+                          <button
+                            onClick={() => setDeleteTarget(school)}
+                            title="حذف المدرسة"
+                            className="flex items-center gap-1 text-xs bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 px-2 py-1.5 rounded-lg transition-colors font-semibold"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            حذف
+                          </button>
+
+                          {/* No-guard quick actions */}
                           {noGuard && (
                             <>
                               <button
@@ -611,14 +785,6 @@ export default function Schools() {
                               </button>
                             </>
                           )}
-                          <button
-                            onClick={() => setSelectedSchool(school)}
-                            title="عرض ملف المدرسة"
-                            className="flex items-center gap-1 text-xs bg-muted text-muted-foreground hover:bg-muted/80 px-2 py-1.5 rounded-lg transition-colors font-medium"
-                          >
-                            <FolderOpen className="w-3.5 h-3.5" />
-                            ملف
-                          </button>
                         </div>
                       </td>
                     </tr>
@@ -633,6 +799,61 @@ export default function Schools() {
       {/* School profile modal */}
       {selectedSchool && (
         <SchoolProfile school={selectedSchool} guards={guards} onClose={() => setSelectedSchool(null)} />
+      )}
+
+      {/* Add / Edit school modal */}
+      {formModal && (
+        <SchoolFormModal
+          initial={formModal.mode === "edit" ? formModal.school : undefined}
+          onSave={handleSaveSchool}
+          onClose={() => setFormModal(null)}
+        />
+      )}
+
+      {/* Delete confirmation */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" dir="rtl">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-foreground">حذف المدرسة</h3>
+                <p className="text-muted-foreground text-xs mt-0.5">هذا الإجراء لا يمكن التراجع عنه</p>
+              </div>
+            </div>
+            <p className="text-sm text-foreground">
+              هل أنت متأكد من حذف مدرسة{" "}
+              <span className="font-bold text-red-700">«{deleteTarget.name}»</span>؟
+            </p>
+            {(() => {
+              const linkedCount = guardCountMap.get(deleteTarget.id) ?? 0;
+              return linkedCount > 0 ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm">
+                  <p className="text-amber-800 font-semibold">تنبيه: {linkedCount} حارس مرتبط بهذه المدرسة</p>
+                  <p className="text-amber-700 text-xs mt-1">
+                    لن يُحذف الحراس — سيُفكّ ارتباطهم بالمدرسة فقط.
+                  </p>
+                </div>
+              ) : null;
+            })()}
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={handleDelete}
+                className="flex-1 bg-red-600 text-white py-2.5 rounded-xl text-sm font-bold hover:bg-red-700 transition-colors"
+              >
+                تأكيد الحذف
+              </button>
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="flex-1 bg-muted text-foreground py-2.5 rounded-xl text-sm font-semibold hover:bg-muted/80 transition-colors"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Quick action modals */}

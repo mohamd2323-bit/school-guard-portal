@@ -152,6 +152,41 @@ export function useStore() {
     [setData]
   );
 
+  // ── Schools CRUD ───────────────────────────────────────────────────────────
+  const addSchool = useCallback(
+    (school: School) =>
+      setData({ ...sharedData, schools: [school, ...sharedData.schools] }),
+    [setData]
+  );
+
+  const updateSchool = useCallback(
+    (id: string, patch: Partial<School>) =>
+      setData({
+        ...sharedData,
+        schools: sharedData.schools.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+        // Keep guard links in sync if name changed
+        guards: sharedData.guards.map((g) =>
+          g.schoolId === id
+            ? { ...g, schoolName: patch.name ?? g.schoolName, governorate: patch.governorate ?? g.governorate }
+            : g
+        ),
+      }),
+    [setData]
+  );
+
+  const deleteSchool = useCallback(
+    (id: string) =>
+      setData({
+        ...sharedData,
+        schools: sharedData.schools.filter((s) => s.id !== id),
+        // Unlink guards — do NOT delete them
+        guards: sharedData.guards.map((g) =>
+          g.schoolId === id ? { ...g, schoolId: null, schoolName: null } : g
+        ),
+      }),
+    [setData]
+  );
+
   // ── Violations ─────────────────────────────────────────────────────────────
   const addViolation = useCallback(
     (v: Violation) => setData({ ...sharedData, violations: [v, ...sharedData.violations] }),
@@ -194,6 +229,9 @@ export function useStore() {
     addOperation,
     addGuard,
     updateGuard,
+    addSchool,
+    updateSchool,
+    deleteSchool,
     addViolation,
     updateViolation,
     deleteViolation,
