@@ -33,16 +33,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         style={{ background: "hsl(174 65% 28%)" }}
       >
         {/* Logo */}
-        <div className="flex items-center gap-3 px-5 py-5 border-b border-white/10">
-          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+        <div className="flex items-start gap-3 px-4 py-4 border-b border-white/10">
+          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0 mt-0.5">
             <ShieldCheck className="w-6 h-6 text-white" />
           </div>
-          <div>
-            <p className="text-white font-bold text-sm leading-tight">بوابة الحراسات</p>
-            <p className="text-white/60 text-xs">المدرسية</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-white/70 text-[10px] font-medium leading-tight">وزارة التعليم</p>
+            <p className="text-white font-bold text-xs leading-snug mt-0.5">إدارة الأمن والسلامة</p>
+            <p className="text-white/80 text-[10px] leading-tight mt-0.5">الأمن المدرسي — تعليم عسير</p>
           </div>
           <button
-            className="mr-auto lg:hidden text-white/70 hover:text-white"
+            className="lg:hidden text-white/70 hover:text-white flex-shrink-0"
             onClick={() => setMobileOpen(false)}
           >
             <X className="w-5 h-5" />
