@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { useStore } from "../store/useStore";
-import { Search, School as SchoolIcon } from "lucide-react";
+import { Search, School as SchoolIcon, FolderOpen } from "lucide-react";
+import SchoolProfile from "../components/SchoolProfile";
+import type { School } from "../types";
 
 export default function Schools() {
-  const { schools } = useStore();
+  const { schools, guards } = useStore();
   const [search, setSearch] = useState("");
+  const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
 
   const filtered = schools.filter(
     (s) =>
@@ -66,6 +69,7 @@ export default function Schools() {
                   <th>اسم المدير/ة</th>
                   <th>سجل المدير/ة</th>
                   <th>جوال المدير/ة</th>
+                  <th className="w-20">ملف</th>
                 </tr>
               </thead>
               <tbody>
@@ -76,7 +80,13 @@ export default function Schools() {
                     <td>{school.level}</td>
                     <td>
                       <span
-                        className={`badge ${school.type === "بنين" ? "badge-male" : school.type === "بنات" ? "badge-female" : "bg-purple-100 text-purple-800"}`}
+                        className={`badge ${
+                          school.type === "بنين"
+                            ? "badge-male"
+                            : school.type === "بنات"
+                            ? "badge-female"
+                            : "bg-purple-100 text-purple-800"
+                        }`}
                       >
                         {school.type}
                       </span>
@@ -86,6 +96,16 @@ export default function Schools() {
                     <td dir="ltr" className="text-right font-mono text-sm">
                       {school.principalPhone}
                     </td>
+                    <td>
+                      <button
+                        onClick={() => setSelectedSchool(school)}
+                        className="flex items-center gap-1.5 text-primary hover:text-primary/80 text-xs bg-primary/5 hover:bg-primary/10 px-2.5 py-1.5 rounded-lg transition-colors font-medium"
+                        title="عرض ملف المدرسة"
+                      >
+                        <FolderOpen className="w-3.5 h-3.5" />
+                        ملف
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -93,6 +113,14 @@ export default function Schools() {
           </div>
         )}
       </div>
+
+      {selectedSchool && (
+        <SchoolProfile
+          school={selectedSchool}
+          guards={guards}
+          onClose={() => setSelectedSchool(null)}
+        />
+      )}
     </div>
   );
 }
