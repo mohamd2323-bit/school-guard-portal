@@ -4,6 +4,7 @@ import {
   ShieldCheck,
   School,
   Database,
+  ClipboardList,
   Menu,
   X,
 } from "lucide-react";
@@ -13,6 +14,7 @@ const navItems = [
   { href: "/", label: "لوحة التحكم", icon: LayoutDashboard },
   { href: "/guards", label: "إدارة الحراس", icon: ShieldCheck },
   { href: "/schools", label: "إدارة المدارس", icon: School },
+  { href: "/needs", label: "الاحتياج", icon: ClipboardList },
   { href: "/data", label: "إدارة البيانات", icon: Database },
 ];
 

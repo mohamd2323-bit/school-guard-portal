@@ -28,6 +28,24 @@ export interface Guard {
   isDemo?: boolean;
 }
 
+export type NeedStatus = "جديد" | "تحت الإجراء" | "تم التغطية" | "مغلق";
+export type NeedType = "حارس" | "حارسة";
+
+export interface Need {
+  id: string;
+  schoolId: string | null;
+  schoolName: string;
+  governorate: string;
+  principalName: string;
+  principalNationalId: string;
+  principalPhone: string;
+  needType: NeedType;
+  reason: string;
+  requestDate: string;
+  status: NeedStatus;
+  createdAt: string;
+}
+
 export interface ImportSummary {
   guardsImported: number;
   schoolsImported: number;
@@ -39,4 +57,5 @@ export interface ImportSummary {
 export interface AppData {
   guards: Guard[];
   schools: School[];
+  needs: Need[];
 }

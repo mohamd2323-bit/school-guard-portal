@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import type { Guard, School, AppData } from "../types";
+import type { Guard, School, Need, NeedStatus, AppData } from "../types";
 import { demoGuards, demoSchools } from "../data/demoData";
 
 const STORAGE_KEY = "school_guards_data";
@@ -7,10 +7,15 @@ const STORAGE_KEY = "school_guards_data";
 function loadFromStorage(): AppData {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { guards: [], schools: [] };
-    return JSON.parse(raw) as AppData;
+    if (!raw) return { guards: [], schools: [], needs: [] };
+    const parsed = JSON.parse(raw) as Partial<AppData>;
+    return {
+      guards: parsed.guards ?? [],
+      schools: parsed.schools ?? [],
+      needs: parsed.needs ?? [],
+    };
   } catch {
-    return { guards: [], schools: [] };
+    return { guards: [], schools: [], needs: [] };
   }
 }
 
@@ -44,33 +49,30 @@ export function useStore() {
 
   const importData = useCallback(
     (guards: Guard[], schools: School[]) => {
-      const demoOnly = {
-        guards: sharedData.guards.filter((g) => g.isDemo),
-        schools: sharedData.schools.filter((s) => s.isDemo),
-      };
-      const newData: AppData = {
-        guards: [...demoOnly.guards, ...guards],
-        schools: [...demoOnly.schools, ...schools],
-      };
-      setData(newData);
+      const demoGuardItems = sharedData.guards.filter((g) => g.isDemo);
+      const demoSchoolItems = sharedData.schools.filter((s) => s.isDemo);
+      setData({
+        guards: [...demoGuardItems, ...guards],
+        schools: [...demoSchoolItems, ...schools],
+        needs: sharedData.needs,
+      });
     },
     [setData]
   );
 
   const clearData = useCallback(() => {
-    const demoOnly = {
+    setData({
       guards: sharedData.guards.filter((g) => g.isDemo),
       schools: sharedData.schools.filter((s) => s.isDemo),
-    };
-    setData(demoOnly);
+      needs: sharedData.needs,
+    });
   }, [setData]);
 
   const loadDemoData = useCallback(() => {
-    const realGuards = sharedData.guards.filter((g) => !g.isDemo);
-    const realSchools = sharedData.schools.filter((s) => !s.isDemo);
     setData({
-      guards: [...demoGuards, ...realGuards],
-      schools: [...demoSchools, ...realSchools],
+      guards: [...demoGuards, ...sharedData.guards.filter((g) => !g.isDemo)],
+      schools: [...demoSchools, ...sharedData.schools.filter((s) => !s.isDemo)],
+      needs: sharedData.needs,
     });
   }, [setData]);
 
@@ -78,8 +80,33 @@ export function useStore() {
     setData({
       guards: sharedData.guards.filter((g) => !g.isDemo),
       schools: sharedData.schools.filter((s) => !s.isDemo),
+      needs: sharedData.needs,
     });
   }, [setData]);
+
+  const addNeed = useCallback(
+    (need: Need) => {
+      setData({ ...sharedData, needs: [need, ...sharedData.needs] });
+    },
+    [setData]
+  );
+
+  const updateNeedStatus = useCallback(
+    (id: string, status: NeedStatus) => {
+      setData({
+        ...sharedData,
+        needs: sharedData.needs.map((n) => (n.id === id ? { ...n, status } : n)),
+      });
+    },
+    [setData]
+  );
+
+  const deleteNeed = useCallback(
+    (id: string) => {
+      setData({ ...sharedData, needs: sharedData.needs.filter((n) => n.id !== id) });
+    },
+    [setData]
+  );
 
   const hasDemoData =
     sharedData.guards.some((g) => g.isDemo) ||
@@ -92,10 +119,14 @@ export function useStore() {
   return {
     guards: sharedData.guards,
     schools: sharedData.schools,
+    needs: sharedData.needs,
     importData,
     clearData,
     loadDemoData,
     clearDemoData,
+    addNeed,
+    updateNeedStatus,
+    deleteNeed,
     hasDemoData,
     hasRealData,
     hasData: sharedData.guards.length > 0 || sharedData.schools.length > 0,
