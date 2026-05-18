@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
-import { useStore, getBackupSnapshot, saveBackupSnapshot, restoreBackupSnapshot } from "../store/useStore";
+import { useStore, getBackupSnapshots, saveBackupSnapshot, restoreBackupSnapshot } from "../store/useStore";
 import type { Guard, School, ImportSummary } from "../types";
 import {
   Upload,
@@ -375,12 +375,13 @@ export default function DataManagement() {
 
   const [backupSaveMsg, setBackupSaveMsg] = useState<"success" | "error" | null>(null);
   const [backupRestoreMsg, setBackupRestoreMsg] = useState<"success" | "noBackup" | null>(null);
-
-  const lastBackup = getBackupSnapshot();
+  const [restoredIndex, setRestoredIndex] = useState<number | null>(null);
+  const [snapshots, setSnapshots] = useState(() => getBackupSnapshots());
 
   function handleSaveBackup() {
     try {
       saveBackupSnapshot();
+      setSnapshots(getBackupSnapshots());
       setBackupSaveMsg("success");
       setTimeout(() => setBackupSaveMsg(null), 4000);
     } catch {
@@ -389,11 +390,13 @@ export default function DataManagement() {
     }
   }
 
-  function handleRestoreBackup() {
-    const ok = restoreBackupSnapshot();
+  function handleRestoreBackup(index: number) {
+    if (!confirm(`هل أنت متأكد من استعادة هذه النسخة؟ سيتم استبدال البيانات الحالية.`)) return;
+    const ok = restoreBackupSnapshot(index);
     if (ok) {
+      setRestoredIndex(index);
       setBackupRestoreMsg("success");
-      setTimeout(() => setBackupRestoreMsg(null), 4000);
+      setTimeout(() => { setBackupRestoreMsg(null); setRestoredIndex(null); }, 4000);
     } else {
       setBackupRestoreMsg("noBackup");
       setTimeout(() => setBackupRestoreMsg(null), 4000);
@@ -666,22 +669,18 @@ export default function DataManagement() {
       </div>
 
       {/* ── Backup / Restore card ── */}
-      <div className="bg-white rounded-xl border border-teal-200 p-5 space-y-3">
-        <div className="flex items-center gap-2 mb-1">
-          <DatabaseBackup className="w-5 h-5 text-teal-600 flex-shrink-0" />
-          <p className="font-semibold text-foreground text-sm">حفظ البيانات واستعادتها</p>
+      <div className="bg-white rounded-xl border border-teal-200 p-5 space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <DatabaseBackup className="w-5 h-5 text-teal-600 flex-shrink-0" />
+            <p className="font-semibold text-foreground text-sm">حفظ البيانات واستعادتها</p>
+          </div>
+          {snapshots.length > 0 && (
+            <span className="text-xs text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full font-medium">
+              {snapshots.length} / 5 نسخ محفوظة
+            </span>
+          )}
         </div>
-
-        {lastBackup && (
-          <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
-            آخر نسخة محفوظة:{" "}
-            <span className="font-semibold text-foreground">{formatBackupDate(lastBackup.timestamp)}</span>
-            {" — "}
-            {(lastBackup.data.guards?.length ?? 0)} حارس،{" "}
-            {(lastBackup.data.schools?.length ?? 0)} مدرسة،{" "}
-            {(lastBackup.data.operations?.length ?? 0)} عملية
-          </p>
-        )}
 
         <div className="flex flex-wrap gap-3">
           <button
@@ -689,7 +688,7 @@ export default function DataManagement() {
             className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-sm"
           >
             <Save className="w-4 h-4" />
-            حفظ البيانات
+            حفظ نسخة الآن
           </button>
           <button
             onClick={handleExport}
@@ -699,20 +698,12 @@ export default function DataManagement() {
             <Download className="w-4 h-4" />
             تصدير كامل
           </button>
-          <button
-            onClick={handleRestoreBackup}
-            disabled={!lastBackup}
-            className="flex items-center gap-2 bg-white border border-teal-300 text-teal-700 hover:bg-teal-50 disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-          >
-            <RotateCcw className="w-4 h-4" />
-            استعادة آخر نسخة
-          </button>
         </div>
 
         {backupSaveMsg === "success" && (
           <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-sm text-green-800">
             <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
-            تم حفظ البيانات بنجاح
+            تم حفظ النسخة بنجاح
           </div>
         )}
         {backupSaveMsg === "error" && (
@@ -732,6 +723,50 @@ export default function DataManagement() {
             <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
             لا توجد نسخة محفوظة بعد — احفظ أولاً
           </div>
+        )}
+
+        {/* Snapshot history list */}
+        {snapshots.length > 0 ? (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">سجل النسخ الاحتياطية</p>
+            <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
+              {snapshots.map((snap, i) => (
+                <div
+                  key={snap.timestamp}
+                  className={`flex items-center justify-between gap-3 px-4 py-3 text-sm transition-colors
+                    ${restoredIndex === i ? "bg-green-50" : i === 0 ? "bg-teal-50/50" : "bg-white hover:bg-muted/30"}`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${i === 0 ? "bg-teal-500" : "bg-border"}`} />
+                    <div className="min-w-0">
+                      <p className="font-semibold text-foreground text-xs truncate">
+                        {formatBackupDate(snap.timestamp)}
+                        {i === 0 && (
+                          <span className="mr-2 text-teal-600 font-medium">(الأحدث)</span>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {(snap.data.guards?.length ?? 0)} حارس ·{" "}
+                        {(snap.data.schools?.length ?? 0)} مدرسة ·{" "}
+                        {(snap.data.operations?.length ?? 0)} عملية
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleRestoreBackup(i)}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-teal-700 bg-white border border-teal-200 hover:bg-teal-50 px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    استعادة
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2.5 text-center">
+            لا توجد نسخ احتياطية بعد — انقر على "حفظ نسخة الآن" لإنشاء أول نسخة
+          </p>
         )}
       </div>
 

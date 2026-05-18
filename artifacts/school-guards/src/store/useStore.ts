@@ -21,6 +21,8 @@ function genId() {
 // ─── Backup (localStorage — local user snapshots, not shared) ─────────────────
 
 const BACKUP_KEY = "school_guards_backup";
+const BACKUP_LIST_KEY = "school_guards_backups";
+const MAX_SNAPSHOTS = 5;
 
 export interface BackupSnapshot {
   timestamp: string;
@@ -28,13 +30,19 @@ export interface BackupSnapshot {
   users: string | null;
 }
 
-export function getBackupSnapshot(): BackupSnapshot | null {
+export function getBackupSnapshots(): BackupSnapshot[] {
   try {
-    const raw = localStorage.getItem(BACKUP_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as BackupSnapshot;
+    const raw = localStorage.getItem(BACKUP_LIST_KEY);
+    if (raw) return JSON.parse(raw) as BackupSnapshot[];
+    // Migrate legacy single-snapshot format
+    const legacy = localStorage.getItem(BACKUP_KEY);
+    if (legacy) {
+      const single = JSON.parse(legacy) as BackupSnapshot;
+      return [single];
+    }
+    return [];
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -46,12 +54,15 @@ export function saveBackupSnapshot(): BackupSnapshot {
     data: sharedData,
     users: usersRaw,
   };
-  localStorage.setItem(BACKUP_KEY, JSON.stringify(snapshot));
+  const existing = getBackupSnapshots();
+  const updated = [snapshot, ...existing].slice(0, MAX_SNAPSHOTS);
+  localStorage.setItem(BACKUP_LIST_KEY, JSON.stringify(updated));
   return snapshot;
 }
 
-export function restoreBackupSnapshot(): boolean {
-  const snapshot = getBackupSnapshot();
+export function restoreBackupSnapshot(index = 0): boolean {
+  const snapshots = getBackupSnapshots();
+  const snapshot = snapshots[index];
   if (!snapshot) return false;
   sharedData = {
     guards: snapshot.data.guards ?? [],
