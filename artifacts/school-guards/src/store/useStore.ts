@@ -160,6 +160,14 @@ export function saveBackupSnapshot(): BackupSnapshot {
   return snapshot;
 }
 
+export function deleteBackupSnapshot(index: number): boolean {
+  if (index < 0 || index >= sharedBackups.length) return false;
+  sharedBackups = sharedBackups.filter((_, i) => i !== index);
+  void apiPut("/api/backups", sharedBackups);
+  notifyAll();
+  return true;
+}
+
 export function restoreBackupSnapshot(index = 0): boolean {
   const snapshot = sharedBackups[index];
   if (!snapshot) return false;

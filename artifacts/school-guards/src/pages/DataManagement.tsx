@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
-import { useStore, useBackups, saveBackupSnapshot, restoreBackupSnapshot } from "../store/useStore";
+import { useStore, useBackups, saveBackupSnapshot, restoreBackupSnapshot, deleteBackupSnapshot } from "../store/useStore";
 import type { Guard, School, ImportSummary } from "../types";
 import {
   Upload,
@@ -400,6 +400,10 @@ export default function DataManagement() {
       setBackupSaveMsg("error");
       setTimeout(() => setBackupSaveMsg(null), 4000);
     }
+  }
+
+  function handleDeleteSnapshot(index: number) {
+    deleteBackupSnapshot(index);
   }
 
   function handleRestoreBackup(index: number) {
@@ -860,13 +864,22 @@ export default function DataManagement() {
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleRestoreBackup(i)}
-                    className="flex items-center gap-1.5 text-xs font-semibold text-teal-700 bg-white border border-teal-200 hover:bg-teal-50 px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    استعادة
-                  </button>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => handleRestoreBackup(i)}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-teal-700 bg-white border border-teal-200 hover:bg-teal-50 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      استعادة
+                    </button>
+                    <button
+                      onClick={() => handleDeleteSnapshot(i)}
+                      title="حذف هذه النسخة"
+                      className="flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 p-1.5 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
