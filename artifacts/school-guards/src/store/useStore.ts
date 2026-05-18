@@ -18,7 +18,8 @@ function genId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-const STORAGE_KEY = "school_guards_data";
+// ─── Backup (localStorage — local user snapshots, not shared) ─────────────────
+
 const BACKUP_KEY = "school_guards_backup";
 
 export interface BackupSnapshot {
@@ -38,10 +39,12 @@ export function getBackupSnapshot(): BackupSnapshot | null {
 }
 
 export function saveBackupSnapshot(): BackupSnapshot {
+  // Capture current users from session storage for backup
+  const usersRaw = localStorage.getItem("school_guards_session_users");
   const snapshot: BackupSnapshot = {
     timestamp: new Date().toISOString(),
     data: sharedData,
-    users: localStorage.getItem("school_guards_users"),
+    users: usersRaw,
   };
   localStorage.setItem(BACKUP_KEY, JSON.stringify(snapshot));
   return snapshot;
@@ -58,42 +61,105 @@ export function restoreBackupSnapshot(): boolean {
     operations: snapshot.data.operations ?? [],
     violations: snapshot.data.violations ?? [],
   };
-  saveToStorage(sharedData);
+  // Fire-and-forget API save
+  saveDataToApi(sharedData).catch(console.error);
+  // Restore employees to API if backed up
   if (snapshot.users) {
-    localStorage.setItem("school_guards_users", snapshot.users);
+    try {
+      const employees = JSON.parse(snapshot.users) as unknown[];
+      fetch("/api/employees", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(employees),
+      }).catch(console.error);
+    } catch {}
   }
   listeners.forEach((fn) => fn());
   return true;
 }
 
-function loadFromStorage(): AppData {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { guards: [], schools: [], needs: [], tickets: [], operations: [], violations: [] };
-    const parsed = JSON.parse(raw) as Partial<AppData>;
-    return {
-      guards: parsed.guards ?? [],
-      schools: parsed.schools ?? [],
-      needs: parsed.needs ?? [],
-      tickets: parsed.tickets ?? [],
-      operations: parsed.operations ?? [],
-      violations: parsed.violations ?? [],
-    };
-  } catch {
-    return { guards: [], schools: [], needs: [], tickets: [], operations: [], violations: [] };
-  }
+// ─── API helpers ──────────────────────────────────────────────────────────────
+
+const EMPTY_DATA: AppData = {
+  guards: [],
+  schools: [],
+  needs: [],
+  tickets: [],
+  operations: [],
+  violations: [],
+};
+
+async function loadDataFromApi(): Promise<AppData> {
+  const res = await fetch("/api/appdata");
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json() as Partial<AppData>;
+  return {
+    guards: json.guards ?? [],
+    schools: json.schools ?? [],
+    needs: json.needs ?? [],
+    tickets: json.tickets ?? [],
+    operations: json.operations ?? [],
+    violations: json.violations ?? [],
+  };
 }
 
-function saveToStorage(data: AppData) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+async function saveDataToApi(data: AppData): Promise<void> {
+  await fetch("/api/appdata", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
 }
+
+// ─── Module-level shared state ────────────────────────────────────────────────
 
 let listeners: Array<() => void> = [];
-let sharedData: AppData = loadFromStorage();
+let sharedData: AppData = { ...EMPTY_DATA };
+let sharedLoading = true;
+let fetchStarted = false;
 
 function notifyAll() {
   listeners.forEach((fn) => fn());
 }
+
+async function initData() {
+  if (fetchStarted) return;
+  fetchStarted = true;
+  try {
+    sharedData = await loadDataFromApi();
+  } catch (err) {
+    console.error("Failed to load app data:", err);
+    sharedData = { ...EMPTY_DATA };
+  } finally {
+    sharedLoading = false;
+    notifyAll();
+  }
+}
+
+// Kick off loading immediately when the module is imported — do not wait for
+// a hook consumer to mount, because App.tsx hides the router until loading is
+// done which would create a deadlock if initData() only ran from useStore().
+void initData();
+
+// ─── Loading hook (use in App.tsx for global loading state) ──────────────────
+
+export function useAppLoading() {
+  const [loading, setLoading] = useState(sharedLoading);
+  useEffect(() => {
+    if (!sharedLoading) {
+      setLoading(false);
+      return;
+    }
+    const listener = () => setLoading(sharedLoading);
+    listeners.push(listener);
+    return () => {
+      listeners = listeners.filter((l) => l !== listener);
+    };
+  }, []);
+  return loading;
+}
+
+// ─── Main store hook ──────────────────────────────────────────────────────────
 
 export function useStore() {
   const [, forceUpdate] = useState(0);
@@ -101,6 +167,8 @@ export function useStore() {
   useEffect(() => {
     const listener = () => forceUpdate((n) => n + 1);
     listeners.push(listener);
+    // Trigger initial fetch on first consumer mount
+    initData();
     return () => {
       listeners = listeners.filter((l) => l !== listener);
     };
@@ -108,7 +176,7 @@ export function useStore() {
 
   const setData = useCallback((data: AppData) => {
     sharedData = data;
-    saveToStorage(data);
+    saveDataToApi(data).catch(console.error);
     notifyAll();
   }, []);
 
@@ -206,7 +274,6 @@ export function useStore() {
     (operationId: string, { endDate, reason, cancelledBy }: { endDate: string; reason: string; cancelledBy: string }) => {
       const origOp = sharedData.operations.find((op) => op.id === operationId);
       if (!origOp) return;
-      // Guard: only cancel active "تكليف حارس" operations
       if (origOp.type !== "تكليف حارس") return;
       if (origOp.assignmentStatus === "منتهي") return;
       const guard = origOp.guardId ? sharedData.guards.find((g) => g.id === origOp.guardId) : null;
@@ -284,7 +351,6 @@ export function useStore() {
       setData({
         ...sharedData,
         schools: sharedData.schools.map((s) => (s.id === id ? { ...s, ...patch } : s)),
-        // Keep guard links in sync if name changed
         guards: sharedData.guards.map((g) =>
           g.schoolId === id
             ? { ...g, schoolName: patch.name ?? g.schoolName, governorate: patch.governorate ?? g.governorate }
@@ -314,7 +380,6 @@ export function useStore() {
       setData({
         ...sharedData,
         schools: sharedData.schools.filter((s) => s.id !== id),
-        // Unlink guards — do NOT delete them
         guards: sharedData.guards.map((g) =>
           g.schoolId === id ? { ...g, schoolId: null, schoolName: null } : g
         ),
@@ -355,6 +420,7 @@ export function useStore() {
     tickets: sharedData.tickets,
     operations: sharedData.operations,
     violations: sharedData.violations,
+    loading: sharedLoading,
     importData,
     clearData,
     loadDemoData,

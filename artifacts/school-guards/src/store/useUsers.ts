@@ -46,84 +46,9 @@ export const ROLE_COLORS: Record<UserRole, string> = {
   "قراءة فقط": "bg-gray-100 text-gray-600",
 };
 
-// ─── Storage keys ─────────────────────────────────────────────────────────────
+// ─── Session (localStorage — per-browser login state only) ───────────────────
 
-const USERS_KEY = "school_guards_users";
-const USERS_BACKUP_KEY = "school_guards_users_bak";
 const SESSION_KEY = "school_guards_session";
-
-// ─── Default admin (fixed ID, no dynamic timestamps) ─────────────────────────
-
-export const DEFAULT_ADMIN: Employee = {
-  id: "default-admin-001",
-  name: "مدير النظام",
-  username: "admin",
-  password: "admin@123",
-  jobTitle: "مدير أمن وسلامة",
-  role: "مدير النظام",
-  status: "نشط",
-  createdAt: "2024-01-01T00:00:00.000Z",
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Parse a JSON string from localStorage into an Employee array.
- * Returns null if the string is missing, empty, or invalid JSON.
- */
-function tryParse(raw: string | null): Employee[] | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) return parsed as Employee[];
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Ensure the default admin is always in the list (by ID).
- * Does NOT duplicate the admin if already present.
- * Does NOT remove any existing employee.
- */
-function ensureAdmin(employees: Employee[]): Employee[] {
-  if (employees.some((e) => e.id === DEFAULT_ADMIN.id)) return employees;
-  return [DEFAULT_ADMIN, ...employees];
-}
-
-// ─── Load: main → backup → fallback ──────────────────────────────────────────
-
-function loadEmployees(): Employee[] {
-  // 1. Try main key
-  const fromMain = tryParse(localStorage.getItem(USERS_KEY));
-  if (fromMain) return ensureAdmin(fromMain);
-
-  // 2. Try backup key
-  const fromBackup = tryParse(localStorage.getItem(USERS_BACKUP_KEY));
-  if (fromBackup) {
-    // Restore main from backup
-    localStorage.setItem(USERS_KEY, JSON.stringify(fromBackup));
-    return ensureAdmin(fromBackup);
-  }
-
-  // 3. First-ever run — seed with default admin only
-  const initial = [DEFAULT_ADMIN];
-  localStorage.setItem(USERS_KEY, JSON.stringify(initial));
-  localStorage.setItem(USERS_BACKUP_KEY, JSON.stringify(initial));
-  return initial;
-}
-
-// ─── Save: always write both keys ────────────────────────────────────────────
-
-function saveEmployees(employees: Employee[]) {
-  const withAdmin = ensureAdmin(employees);
-  const serialized = JSON.stringify(withAdmin);
-  localStorage.setItem(USERS_KEY, serialized);
-  localStorage.setItem(USERS_BACKUP_KEY, serialized);
-}
-
-// ─── Session ──────────────────────────────────────────────────────────────────
 
 function loadSession(): Employee | null {
   try {
@@ -140,14 +65,81 @@ function saveSession(user: Employee | null) {
   else localStorage.removeItem(SESSION_KEY);
 }
 
+// ─── Default admin (seeded on first run) ──────────────────────────────────────
+
+export const DEFAULT_ADMIN: Employee = {
+  id: "default-admin-001",
+  name: "مدير النظام",
+  username: "admin",
+  password: "admin@123",
+  jobTitle: "مدير أمن وسلامة",
+  role: "مدير النظام",
+  status: "نشط",
+  createdAt: "2024-01-01T00:00:00.000Z",
+};
+
+// ─── API helpers ──────────────────────────────────────────────────────────────
+
+async function fetchEmployees(): Promise<Employee[]> {
+  const res = await fetch("/api/employees");
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json() as Promise<Employee[]>;
+}
+
+async function persistEmployees(employees: Employee[]): Promise<void> {
+  await fetch("/api/employees", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(employees),
+  });
+}
+
+function ensureAdmin(employees: Employee[]): Employee[] {
+  if (employees.some((e) => e.id === DEFAULT_ADMIN.id)) return employees;
+  return [DEFAULT_ADMIN, ...employees];
+}
+
 // ─── Module-level shared state ────────────────────────────────────────────────
 
 let userListeners: Array<() => void> = [];
-let sharedEmployees: Employee[] = loadEmployees();
+let sharedEmployees: Employee[] = [];
 let sharedSession: Employee | null = loadSession();
+let usersFetchStarted = false;
 
 function notifyUsers() {
   userListeners.forEach((fn) => fn());
+}
+
+async function initEmployees() {
+  if (usersFetchStarted) return;
+  usersFetchStarted = true;
+  try {
+    let employees = await fetchEmployees();
+    // First run: seed default admin if list is empty
+    if (employees.length === 0) {
+      employees = [DEFAULT_ADMIN];
+      await persistEmployees(employees);
+    } else {
+      employees = ensureAdmin(employees);
+    }
+    sharedEmployees = employees;
+    // Keep session user in sync with server data
+    if (sharedSession) {
+      const fresh = sharedEmployees.find((e) => e.id === sharedSession!.id);
+      if (!fresh || fresh.status !== "نشط") {
+        sharedSession = null;
+        saveSession(null);
+      } else {
+        sharedSession = fresh;
+        saveSession(fresh);
+      }
+    }
+  } catch (err) {
+    console.error("Failed to load employees:", err);
+    // Fallback: show default admin so login still works
+    sharedEmployees = [DEFAULT_ADMIN];
+  }
+  notifyUsers();
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
@@ -156,14 +148,9 @@ export function useUsers() {
   const [, forceUpdate] = useState(0);
 
   useEffect(() => {
-    // Re-sync from localStorage on mount (handles HMR re-init edge cases)
-    const fresh = loadEmployees();
-    if (fresh.length > sharedEmployees.length) {
-      sharedEmployees = fresh;
-    }
-
     const listener = () => forceUpdate((n) => n + 1);
     userListeners.push(listener);
+    initEmployees();
     return () => {
       userListeners = userListeners.filter((l) => l !== listener);
     };
@@ -171,7 +158,7 @@ export function useUsers() {
 
   const addEmployee = useCallback((emp: Employee) => {
     sharedEmployees = ensureAdmin([emp, ...sharedEmployees]);
-    saveEmployees(sharedEmployees);
+    persistEmployees(sharedEmployees).catch(console.error);
     notifyUsers();
   }, []);
 
@@ -179,7 +166,7 @@ export function useUsers() {
     sharedEmployees = ensureAdmin(
       sharedEmployees.map((e) => (e.id === id ? { ...e, ...patch } : e))
     );
-    saveEmployees(sharedEmployees);
+    persistEmployees(sharedEmployees).catch(console.error);
     if (sharedSession?.id === id) {
       const updated = sharedEmployees.find((e) => e.id === id) ?? null;
       sharedSession = updated;
@@ -191,7 +178,7 @@ export function useUsers() {
   const deleteEmployee = useCallback((id: string) => {
     if (id === DEFAULT_ADMIN.id) return;
     sharedEmployees = sharedEmployees.filter((e) => e.id !== id);
-    saveEmployees(sharedEmployees);
+    persistEmployees(sharedEmployees).catch(console.error);
     notifyUsers();
   }, []);
 
@@ -201,7 +188,7 @@ export function useUsers() {
         e.id === id ? { ...e, status: e.status === "نشط" ? "غير نشط" : "نشط" } : e
       )
     );
-    saveEmployees(sharedEmployees);
+    persistEmployees(sharedEmployees).catch(console.error);
     notifyUsers();
   }, []);
 
@@ -209,33 +196,36 @@ export function useUsers() {
     sharedEmployees = ensureAdmin(
       sharedEmployees.map((e) => (e.id === id ? { ...e, password: newPassword } : e))
     );
-    saveEmployees(sharedEmployees);
+    persistEmployees(sharedEmployees).catch(console.error);
     notifyUsers();
   }, []);
 
-  const login = useCallback((username: string, password: string): Employee | null => {
-    // Always re-read from storage before checking — prevents stale in-memory list
-    const currentList = loadEmployees();
-    if (currentList.length > sharedEmployees.length) {
-      sharedEmployees = currentList;
-    }
+  const login = useCallback(async (username: string, password: string): Promise<Employee | null> => {
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.trim(), password }),
+      });
+      if (!res.ok) return null;
+      const user = await res.json() as Employee;
 
-    const user = sharedEmployees.find(
-      (e) => e.username === username.trim() && e.password === password && e.status === "نشط"
-    );
-    if (user) {
+      // Update lastLogin in the server list
       const now = new Date().toISOString();
       sharedEmployees = ensureAdmin(
         sharedEmployees.map((e) => (e.id === user.id ? { ...e, lastLogin: now } : e))
       );
-      saveEmployees(sharedEmployees);
+      persistEmployees(sharedEmployees).catch(console.error);
+
       const updated = { ...user, lastLogin: now };
       sharedSession = updated;
       saveSession(updated);
       notifyUsers();
       return updated;
+    } catch (err) {
+      console.error("Login error:", err);
+      return null;
     }
-    return null;
   }, []);
 
   const logout = useCallback(() => {

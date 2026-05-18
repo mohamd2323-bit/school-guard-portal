@@ -90,15 +90,22 @@ function ModalHeader({ title, icon, onClose }: {
 
 // ─── Login screen ─────────────────────────────────────────────────────────────
 
-function LoginScreen({ onLogin }: { onLogin: (u: string, p: string) => boolean }) {
+function LoginScreen({ onLogin }: { onLogin: (u: string, p: string) => Promise<boolean> }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!onLogin(username, password))
-      setError("اسم المستخدم أو كلمة المرور غير صحيحة، أو الحساب غير نشط");
+    setSubmitting(true);
+    setError("");
+    try {
+      const ok = await onLogin(username, password);
+      if (!ok) setError("اسم المستخدم أو كلمة المرور غير صحيحة، أو الحساب غير نشط");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -137,10 +144,12 @@ function LoginScreen({ onLogin }: { onLogin: (u: string, p: string) => boolean }
               {error}
             </div>
           )}
-          <button type="submit"
-            className="w-full bg-primary text-white py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
-            <LogIn className="w-4 h-4" />
-            تسجيل الدخول
+          <button type="submit" disabled={submitting}
+            className="w-full bg-primary text-white py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
+            {submitting
+              ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              : <LogIn className="w-4 h-4" />}
+            {submitting ? "جارٍ التحقق…" : "تسجيل الدخول"}
           </button>
         </form>
       </div>
@@ -449,7 +458,7 @@ export default function Users() {
 
   // ── Not logged in ─────────────────────────────────────────────────────────
   if (!currentUser) {
-    return <LoginScreen onLogin={(u, p) => !!login(u, p)} />;
+    return <LoginScreen onLogin={async (u, p) => !!(await login(u, p))} />;
   }
 
   // ── Logged in but not admin ───────────────────────────────────────────────

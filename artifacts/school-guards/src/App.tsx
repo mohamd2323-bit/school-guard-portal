@@ -9,11 +9,23 @@ import Tickets from "./pages/Tickets";
 import Operations from "./pages/Operations";
 import Violations from "./pages/Violations";
 import Users from "./pages/Users";
+import { useAppLoading } from "./store/useStore";
 
 function NotFound() {
   return (
     <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
       الصفحة غير موجودة
+    </div>
+  );
+}
+
+function LoadingScreen() {
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-white z-50">
+      <div className="text-center">
+        <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin mx-auto mb-4" />
+        <p className="text-sm text-muted-foreground font-medium">جارٍ تحميل البيانات…</p>
+      </div>
     </div>
   );
 }
@@ -38,9 +50,11 @@ function Router() {
 }
 
 function App() {
+  const loading = useAppLoading();
+
   return (
     <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-      <Router />
+      {loading ? <LoadingScreen /> : <Router />}
     </WouterRouter>
   );
 }
