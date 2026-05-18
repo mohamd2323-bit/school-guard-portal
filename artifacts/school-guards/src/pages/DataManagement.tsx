@@ -13,6 +13,8 @@ import {
   XCircle,
   Files,
   File,
+  Save,
+  Ban,
 } from "lucide-react";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -351,11 +353,19 @@ function DropZone({
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+// Pending import — parsed but not yet committed
+type PendingImport = {
+  guards: Guard[];
+  schools: School[];
+  summary: ImportSummary;
+};
+
 export default function DataManagement() {
   const { importData, clearData, clearDemoData, loadDemoData, hasData, hasDemoData, hasRealData, guards, schools } = useStore();
 
   const [mode, setMode] = useState<"single" | "dual">("single");
-  const [summary, setSummary] = useState<ImportSummary | null>(null);
+  const [pending, setPending] = useState<PendingImport | null>(null);
+  const [saved, setSaved] = useState(false);
   const [importing, setImporting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const singleRef = useRef<HTMLInputElement>(null);
@@ -369,7 +379,7 @@ export default function DataManagement() {
   const realGuardsCount = guards.filter((g) => !g.isDemo).length;
   const realSchoolsCount = schools.filter((s) => !s.isDemo).length;
 
-  // ── Single-file import ───────────────────────────────────────────────────
+  // ── Shared helpers ───────────────────────────────────────────────────────
 
   function readWorkbook(file: File): Promise<XLSX.WorkBook> {
     return new Promise((resolve, reject) => {
@@ -384,32 +394,55 @@ export default function DataManagement() {
     });
   }
 
+  function commitPending() {
+    if (!pending) return;
+    importData(pending.guards, pending.schools);
+    setPending(null);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 6000);
+  }
+
+  function cancelPending() {
+    setPending(null);
+  }
+
+  // ── Single-file: parse only, do NOT save yet ─────────────────────────────
+
   async function processSingleFile(file: File) {
     setImporting(true);
-    setSummary(null);
+    setPending(null);
+    setSaved(false);
     try {
       const wb = await readWorkbook(file);
       const { schools: importedSchools, guards: importedGuards, linkedCount, errors } = processWorkbook(wb);
-      importData(importedGuards, importedSchools);
-      setSummary({
-        guardsImported: importedGuards.length,
-        schoolsImported: importedSchools.length,
-        linkedRecords: linkedCount,
-        failedRecords: errors.length,
-        errors,
+      setPending({
+        guards: importedGuards,
+        schools: importedSchools,
+        summary: {
+          guardsImported: importedGuards.length,
+          schoolsImported: importedSchools.length,
+          linkedRecords: linkedCount,
+          failedRecords: errors.length,
+          errors,
+        },
       });
     } catch (err) {
-      setSummary({ guardsImported: 0, schoolsImported: 0, linkedRecords: 0, failedRecords: 1, errors: ["حدث خطأ أثناء قراءة الملف: " + String(err)] });
+      setPending({
+        guards: [],
+        schools: [],
+        summary: { guardsImported: 0, schoolsImported: 0, linkedRecords: 0, failedRecords: 1, errors: ["حدث خطأ أثناء قراءة الملف: " + String(err)] },
+      });
     }
     setImporting(false);
   }
 
-  // ── Dual-file import ─────────────────────────────────────────────────────
+  // ── Dual-file: parse only, do NOT save yet ───────────────────────────────
 
   async function processDualFiles() {
     if (!schoolsFile && !guardsFile) return;
     setImporting(true);
-    setSummary(null);
+    setPending(null);
+    setSaved(false);
     try {
       const allErrors: string[] = [];
       let importedSchools: School[] = [];
@@ -441,18 +474,25 @@ export default function DataManagement() {
         }
       }
 
-      importData(importedGuards, importedSchools);
-      setSummary({
-        guardsImported: importedGuards.length,
-        schoolsImported: importedSchools.length,
-        linkedRecords: linkedCount,
-        failedRecords: allErrors.length,
-        errors: allErrors,
+      setPending({
+        guards: importedGuards,
+        schools: importedSchools,
+        summary: {
+          guardsImported: importedGuards.length,
+          schoolsImported: importedSchools.length,
+          linkedRecords: linkedCount,
+          failedRecords: allErrors.length,
+          errors: allErrors,
+        },
       });
       setSchoolsFile(null);
       setGuardsFile(null);
     } catch (err) {
-      setSummary({ guardsImported: 0, schoolsImported: 0, linkedRecords: 0, failedRecords: 1, errors: ["حدث خطأ: " + String(err)] });
+      setPending({
+        guards: [],
+        schools: [],
+        summary: { guardsImported: 0, schoolsImported: 0, linkedRecords: 0, failedRecords: 1, errors: ["حدث خطأ: " + String(err)] },
+      });
     }
     setImporting(false);
   }
@@ -619,44 +659,90 @@ export default function DataManagement() {
         </div>
       )}
 
-      {/* Import Summary */}
-      {summary && (
-        <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-border flex items-center gap-2">
-            {summary.failedRecords === 0 ? (
+      {/* Success banner */}
+      {saved && (
+        <div className="bg-green-50 border border-green-300 rounded-2xl px-6 py-4 flex items-center gap-3">
+          <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
+          <div>
+            <p className="font-bold text-green-800 text-sm">تم حفظ البيانات بنجاح</p>
+            <p className="text-green-700 text-xs mt-0.5">
+              تم حفظ البيانات المستوردة وربطها بالنظام بنجاح — يمكنك الآن الاطلاع عليها من إدارة الحراس وإدارة المدارس
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Pending preview + save/cancel */}
+      {pending && (
+        <div className="bg-white rounded-2xl border-2 border-primary/30 shadow-sm overflow-hidden">
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-border flex items-center gap-2"
+            style={{ background: "hsl(174 65% 96%)" }}>
+            {pending.summary.failedRecords === 0 ? (
               <CheckCircle className="w-5 h-5 text-green-600" />
             ) : (
               <AlertCircle className="w-5 h-5 text-orange-500" />
             )}
-            <h3 className="font-bold text-base text-foreground">ملخص الاستيراد</h3>
+            <h3 className="font-bold text-base text-foreground flex-1">معاينة البيانات المستوردة</h3>
+            <span className="text-xs text-primary font-semibold bg-primary/10 px-3 py-1 rounded-full">
+              في انتظار الحفظ
+            </span>
           </div>
-          <div className="p-6">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
+
+          {/* Stats grid */}
+          <div className="p-6 space-y-5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
-                { label: "حراس مستوردون", value: summary.guardsImported, color: "text-teal-700 bg-teal-50" },
-                { label: "مدارس مستوردة", value: summary.schoolsImported, color: "text-blue-700 bg-blue-50" },
-                { label: "سجلات مرتبطة", value: summary.linkedRecords, color: "text-green-700 bg-green-50" },
-                { label: "تحذيرات", value: summary.failedRecords, color: summary.failedRecords > 0 ? "text-orange-700 bg-orange-50" : "text-gray-500 bg-gray-50" },
+                { label: "حراس مستوردون", value: pending.summary.guardsImported, color: "text-teal-700 bg-teal-50 border-teal-200" },
+                { label: "مدارس مستوردة", value: pending.summary.schoolsImported, color: "text-blue-700 bg-blue-50 border-blue-200" },
+                { label: "سجلات مرتبطة", value: pending.summary.linkedRecords, color: "text-green-700 bg-green-50 border-green-200" },
+                { label: "تحذيرات", value: pending.summary.failedRecords, color: pending.summary.failedRecords > 0 ? "text-orange-700 bg-orange-50 border-orange-200" : "text-gray-500 bg-gray-50 border-gray-200" },
               ].map((item) => (
-                <div key={item.label} className={`rounded-xl p-4 ${item.color} text-center`}>
+                <div key={item.label} className={`rounded-xl p-4 border ${item.color} text-center`}>
                   <p className="text-2xl font-bold">{item.value}</p>
                   <p className="text-xs mt-1 opacity-80">{item.label}</p>
                 </div>
               ))}
             </div>
-            {summary.errors.length > 0 && (
+
+            {/* Warnings */}
+            {pending.summary.errors.length > 0 && (
               <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
                 <p className="text-orange-800 font-semibold text-sm mb-2">التفاصيل والتحذيرات:</p>
                 <ul className="space-y-1">
-                  {summary.errors.slice(0, 20).map((err, i) => (
+                  {pending.summary.errors.slice(0, 20).map((err, i) => (
                     <li key={i} className="text-orange-700 text-xs">• {err}</li>
                   ))}
-                  {summary.errors.length > 20 && (
-                    <li className="text-orange-500 text-xs">... و {summary.errors.length - 20} تحذيرات أخرى</li>
+                  {pending.summary.errors.length > 20 && (
+                    <li className="text-orange-500 text-xs">... و {pending.summary.errors.length - 20} تحذيرات أخرى</li>
                   )}
                 </ul>
               </div>
             )}
+
+            {/* Notice */}
+            <div className="bg-primary/5 border border-primary/20 rounded-xl px-4 py-3 text-sm text-primary flex items-center gap-2">
+              <Info className="w-4 h-4 flex-shrink-0" />
+              <span>البيانات معروضة للمعاينة فقط — يجب النقر على <strong>حفظ البيانات المستوردة</strong> لحفظها بشكل نهائي في النظام.</span>
+            </div>
+
+            {/* Save / Cancel buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={commitPending}
+                className="flex-1 flex items-center justify-center gap-2 bg-primary text-white py-3 rounded-2xl text-sm font-bold hover:bg-primary/90 transition-colors"
+              >
+                <Save className="w-4 h-4" />
+                حفظ البيانات المستوردة
+              </button>
+              <button
+                onClick={cancelPending}
+                className="flex items-center justify-center gap-2 bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 px-5 py-3 rounded-2xl text-sm font-semibold transition-colors"
+              >
+                <Ban className="w-4 h-4" />
+                إلغاء الاستيراد
+              </button>
+            </div>
           </div>
         </div>
       )}
