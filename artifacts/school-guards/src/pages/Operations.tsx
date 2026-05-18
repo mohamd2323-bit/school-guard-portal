@@ -23,6 +23,8 @@ import {
   Filter,
   FileSpreadsheet,
   User2,
+  Ban,
+  Trash2,
 } from "lucide-react";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -66,6 +68,8 @@ const OP_COLORS: Record<OperationType, string> = {
   "تعديل بيانات": "bg-purple-100 text-purple-800",
   "إلغاء تكليف":  "bg-rose-100 text-rose-800",
   "إنهاء نقل":    "bg-orange-100 text-orange-800",
+  "إنهاء تكليف":  "bg-red-100 text-red-800",
+  "حذف مدرسة":    "bg-red-100 text-red-800",
   "أخرى":         "bg-gray-100 text-gray-700",
 };
 
@@ -77,12 +81,14 @@ const OP_ICON: Record<OperationType, React.ReactNode> = {
   "تعديل بيانات": <Pencil className="w-3 h-3" />,
   "إلغاء تكليف":  <X className="w-3 h-3" />,
   "إنهاء نقل":    <ArrowLeftRight className="w-3 h-3" />,
+  "إنهاء تكليف":  <Ban className="w-3 h-3" />,
+  "حذف مدرسة":    <Trash2 className="w-3 h-3" />,
   "أخرى":         <Settings2 className="w-3 h-3" />,
 };
 
 const ALL_OP_TYPES: OperationType[] = [
   "نقل حارس", "تكليف حارس", "بدل حارس", "تعديل بيانات",
-  "إضافة حارس", "إلغاء تكليف", "إنهاء نقل", "أخرى",
+  "إضافة حارس", "إلغاء تكليف", "إنهاء نقل", "إنهاء تكليف", "حذف مدرسة", "أخرى",
 ];
 
 function opSummary(op: Operation): string {
@@ -98,6 +104,8 @@ function opSummary(op: Operation): string {
       return `${d.entity || "—"} (${d.startDate || ""}–${d.endDate || ""})`;
     case "إلغاء تكليف":
       return `إلغاء تكليف: ${d.entity || "—"}`;
+    case "إنهاء تكليف":
+      return `إنهاء تكليف: ${d.entity || "—"}${d.cancelledBy ? ` — بواسطة: ${d.cancelledBy}` : ""}`;
     case "بدل حارس":
       return `حالة البدل: ${d.allowanceStatus || "—"}`;
     case "تعديل بيانات":
@@ -1040,7 +1048,7 @@ function openLetterWindow(html: string, autoPrint = false) {
 }
 
 function AssignmentModal({ guards, onClose }: { guards: Guard[]; onClose: () => void }) {
-  const { addOperation } = useStore();
+  const { assignGuard } = useStore();
   const { currentUser } = useUsers();
 
   const [phase, setPhase] = useState<"form" | "letter">("form");
@@ -1070,7 +1078,7 @@ function AssignmentModal({ guards, onClose }: { guards: Guard[]; onClose: () => 
       endDate,
       reason: reason.trim(),
     }, currentUser?.name ?? "النظام");
-    addOperation(op);
+    assignGuard(op, guard);
 
     const ld: LetterData = {
       guardName: guard.name,
@@ -1584,6 +1592,101 @@ function EditGuardModal({ guards, schools, onClose }: { guards: Guard[]; schools
   );
 }
 
+// ─── 6. Cancel assignment dialog ──────────────────────────────────────────────
+
+function CancelAssignmentDialog({
+  op,
+  onConfirm,
+  onClose,
+}: {
+  op: Operation;
+  onConfirm: (data: { endDate: string; reason: string; cancelledBy: string }) => void;
+  onClose: () => void;
+}) {
+  const [endDate, setEndDate] = useState(todayStr());
+  const [reason, setReason] = useState("");
+  const [cancelledBy, setCancelledBy] = useState("");
+  const [error, setError] = useState("");
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!endDate) { setError("يرجى تحديد تاريخ إنهاء التكليف"); return; }
+    if (!reason.trim()) { setError("يرجى كتابة سبب الإلغاء"); return; }
+    if (!cancelledBy.trim()) { setError("يرجى تحديد من أنهى التكليف"); return; }
+    setError("");
+    onConfirm({ endDate, reason: reason.trim(), cancelledBy: cancelledBy.trim() });
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" dir="rtl">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 py-4 rounded-t-2xl"
+          style={{ background: "hsl(0 72% 42%)" }}>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white">
+              <Ban className="w-5 h-5" />
+            </div>
+            <h2 className="text-white font-bold text-base">إنهاء التكليف</h2>
+          </div>
+          <button onClick={onClose}
+            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-800">
+            <p className="font-semibold mb-1">هل أنت متأكد من إنهاء هذا التكليف؟</p>
+            <p className="text-red-700 text-xs">
+              سيتم إنهاء تكليف الحارس <span className="font-bold">{op.guardName}</span> من جهة{" "}
+              <span className="font-bold">{op.details.entity || "—"}</span>{" "}
+              واستعادته إلى مدرسته الأصلية تلقائياً.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <FieldLabel required>تاريخ إنهاء التكليف</FieldLabel>
+              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-red-400/30" />
+            </div>
+
+            <div>
+              <FieldLabel required>سبب الإلغاء</FieldLabel>
+              <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2}
+                placeholder="اكتب سبب إنهاء التكليف..."
+                className="w-full px-4 py-2.5 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-red-400/30 resize-none" />
+            </div>
+
+            <div>
+              <FieldLabel required>تم بواسطة</FieldLabel>
+              <input type="text" value={cancelledBy} onChange={(e) => setCancelledBy(e.target.value)}
+                placeholder="اسم الموظف المنفذ..."
+                className="w-full px-4 py-2.5 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-red-400/30" />
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-sm text-red-700">{error}</div>
+            )}
+
+            <div className="flex gap-3 pt-1">
+              <button type="submit"
+                className="flex-1 bg-red-600 text-white py-2.5 rounded-xl text-sm font-bold hover:bg-red-700 transition-colors flex items-center justify-center gap-2">
+                <Ban className="w-4 h-4" />
+                تأكيد إنهاء التكليف
+              </button>
+              <button type="button" onClick={onClose}
+                className="flex-1 bg-muted text-foreground py-2.5 rounded-xl text-sm font-semibold hover:bg-muted/80 transition-colors">
+                إلغاء
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Operation cards data ─────────────────────────────────────────────────────
 
 type ModalKey = "transfer" | "addGuard" | "assignment" | "allowance" | "edit";
@@ -1712,8 +1815,9 @@ function buildReportHTML(ops: Operation[], filterLabel: string): string {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Operations() {
-  const { guards, schools, operations } = useStore();
+  const { guards, schools, operations, cancelAssignment } = useStore();
   const [activeModal, setActiveModal] = useState<ModalKey | null>(null);
+  const [cancelDialogOp, setCancelDialogOp] = useState<Operation | null>(null);
 
   // ── filter state ──
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -2010,40 +2114,80 @@ export default function Operations() {
                     <th>تم بواسطة</th>
                     <th>تاريخ العملية</th>
                     <th>ملاحظات</th>
+                    <th>الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((op) => (
-                    <tr key={op.id}>
-                      <td>
-                        <span className={`badge flex items-center gap-1.5 w-fit ${OP_COLORS[op.type] ?? "bg-gray-100 text-gray-700"}`}>
-                          {OP_ICON[op.type]}
-                          {op.type}
-                        </span>
-                      </td>
-                      <td className="font-medium text-foreground">{op.guardName}</td>
-                      <td>
-                        <p className="text-sm text-foreground max-w-56 line-clamp-2">{opSummary(op)}</p>
-                      </td>
-                      <td>
-                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                          <User2 className="w-3.5 h-3.5 flex-shrink-0 text-primary/50" />
-                          <span className="font-medium text-foreground">{op.performedBy || "—"}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <div className="flex items-center gap-1.5 text-sm">
-                          <Calendar className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                          {formatDate(op.date)}
-                        </div>
-                      </td>
-                      <td>
-                        <p className="text-sm text-muted-foreground max-w-40 line-clamp-1">
-                          {op.notes || "—"}
-                        </p>
-                      </td>
-                    </tr>
-                  ))}
+                  {filtered.map((op) => {
+                    // Treat legacy rows (no assignmentStatus) as active for backward compat
+                    const isActiveAssignment =
+                      op.type === "تكليف حارس" &&
+                      (op.assignmentStatus === "نشط" || op.assignmentStatus === undefined);
+                    const isEndedAssignment = op.type === "تكليف حارس" && op.assignmentStatus === "منتهي";
+                    const badgeClass = isActiveAssignment
+                      ? "bg-green-100 text-green-800"
+                      : isEndedAssignment
+                        ? "bg-red-100 text-red-700"
+                        : (op.type === "إنهاء تكليف"
+                          ? "bg-red-100 text-red-800"
+                          : (OP_COLORS[op.type] ?? "bg-gray-100 text-gray-700"));
+                    return (
+                      <tr key={op.id}>
+                        <td>
+                          <div className="space-y-1">
+                            <span className={`badge flex items-center gap-1.5 w-fit ${badgeClass}`}>
+                              {OP_ICON[op.type]}
+                              {op.type}
+                            </span>
+                            {isActiveAssignment && (
+                              <span className="badge bg-green-50 text-green-700 text-[10px] w-fit flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span>
+                                نشط
+                              </span>
+                            )}
+                            {isEndedAssignment && (
+                              <span className="badge bg-red-50 text-red-600 text-[10px] w-fit flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block"></span>
+                                منتهي
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="font-medium text-foreground">{op.guardName}</td>
+                        <td>
+                          <p className="text-sm text-foreground max-w-56 line-clamp-2">{opSummary(op)}</p>
+                        </td>
+                        <td>
+                          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                            <User2 className="w-3.5 h-3.5 flex-shrink-0 text-primary/50" />
+                            <span className="font-medium text-foreground">{op.performedBy || "—"}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="flex items-center gap-1.5 text-sm">
+                            <Calendar className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                            {formatDate(op.date)}
+                          </div>
+                        </td>
+                        <td>
+                          <p className="text-sm text-muted-foreground max-w-40 line-clamp-1">
+                            {op.notes || "—"}
+                          </p>
+                        </td>
+                        <td>
+                          {isActiveAssignment && (
+                            <button
+                              onClick={() => setCancelDialogOp(op)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-colors whitespace-nowrap"
+                            >
+                              <Ban className="w-3 h-3" />
+                              إلغاء التكليف
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -2066,6 +2210,16 @@ export default function Operations() {
       )}
       {activeModal === "edit" && (
         <EditGuardModal guards={guards} schools={schools} onClose={() => setActiveModal(null)} />
+      )}
+      {cancelDialogOp && (
+        <CancelAssignmentDialog
+          op={cancelDialogOp}
+          onConfirm={(data) => {
+            cancelAssignment(cancelDialogOp.id, data);
+            setCancelDialogOp(null);
+          }}
+          onClose={() => setCancelDialogOp(null)}
+        />
       )}
     </div>
   );

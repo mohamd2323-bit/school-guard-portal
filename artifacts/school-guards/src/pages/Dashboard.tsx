@@ -263,6 +263,20 @@ export default function Dashboard() {
           .filter((id) => filteredGuards.some((g) => g.id === id))
       ).size;
 
+    // Active assignments: "تكليف حارس" where assignmentStatus is "نشط"
+    // OR has no assignmentStatus at all (legacy records before the field was added)
+    const activeAssignmentGuardIds = new Set(
+      operations
+        .filter(
+          (op) =>
+            op.type === "تكليف حارس" &&
+            op.guardId &&
+            (op.assignmentStatus === "نشط" || op.assignmentStatus === undefined) &&
+            filteredGuards.some((g) => g.id === op.guardId)
+        )
+        .map((op) => op.guardId!)
+    );
+
     return {
       total: filteredGuards.length,
       schools: filteredSchools.length,
@@ -270,7 +284,7 @@ export default function Dashboard() {
       female: filteredGuards.filter((g) => g.gender === "أنثى").length,
       schoolsNoGuard,
       active: filteredGuards.filter((g) => g.status === "نشط").length,
-      delegated: assignedToOperation("تكليف حارس"),
+      delegated: activeAssignmentGuardIds.size,
       allowance: assignedToOperation("بدل حارس"),
     };
   }, [filteredGuards, filteredSchools, operations]);

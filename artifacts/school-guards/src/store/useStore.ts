@@ -7,12 +7,64 @@ import type {
   Ticket,
   TicketStatus,
   Operation,
+  OperationType,
   Violation,
   AppData,
 } from "../types";
+
 import { demoGuards, demoSchools } from "../data/demoData";
 
+function genId() {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
 const STORAGE_KEY = "school_guards_data";
+const BACKUP_KEY = "school_guards_backup";
+
+export interface BackupSnapshot {
+  timestamp: string;
+  data: AppData;
+  users: string | null;
+}
+
+export function getBackupSnapshot(): BackupSnapshot | null {
+  try {
+    const raw = localStorage.getItem(BACKUP_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as BackupSnapshot;
+  } catch {
+    return null;
+  }
+}
+
+export function saveBackupSnapshot(): BackupSnapshot {
+  const snapshot: BackupSnapshot = {
+    timestamp: new Date().toISOString(),
+    data: sharedData,
+    users: localStorage.getItem("school_guards_users"),
+  };
+  localStorage.setItem(BACKUP_KEY, JSON.stringify(snapshot));
+  return snapshot;
+}
+
+export function restoreBackupSnapshot(): boolean {
+  const snapshot = getBackupSnapshot();
+  if (!snapshot) return false;
+  sharedData = {
+    guards: snapshot.data.guards ?? [],
+    schools: snapshot.data.schools ?? [],
+    needs: snapshot.data.needs ?? [],
+    tickets: snapshot.data.tickets ?? [],
+    operations: snapshot.data.operations ?? [],
+    violations: snapshot.data.violations ?? [],
+  };
+  saveToStorage(sharedData);
+  if (snapshot.users) {
+    localStorage.setItem("school_guards_users", snapshot.users);
+  }
+  listeners.forEach((fn) => fn());
+  return true;
+}
 
 function loadFromStorage(): AppData {
   try {
@@ -136,6 +188,74 @@ export function useStore() {
     [setData]
   );
 
+  const assignGuard = useCallback(
+    (op: Operation, guard: Guard) =>
+      setData({
+        ...sharedData,
+        guards: sharedData.guards.map((g) =>
+          g.id === guard.id
+            ? { ...g, previousSchoolId: g.schoolId, previousSchoolName: g.schoolName }
+            : g
+        ),
+        operations: [{ ...op, assignmentStatus: "نشط" as const }, ...sharedData.operations],
+      }),
+    [setData]
+  );
+
+  const cancelAssignment = useCallback(
+    (operationId: string, { endDate, reason, cancelledBy }: { endDate: string; reason: string; cancelledBy: string }) => {
+      const origOp = sharedData.operations.find((op) => op.id === operationId);
+      if (!origOp) return;
+      // Guard: only cancel active "تكليف حارس" operations
+      if (origOp.type !== "تكليف حارس") return;
+      if (origOp.assignmentStatus === "منتهي") return;
+      const guard = origOp.guardId ? sharedData.guards.find((g) => g.id === origOp.guardId) : null;
+
+      const cancelOp: Operation = {
+        id: genId(),
+        type: "إنهاء تكليف" as OperationType,
+        guardId: origOp.guardId,
+        guardName: origOp.guardName,
+        date: endDate,
+        notes: reason,
+        createdAt: new Date().toISOString(),
+        details: {
+          originalOpId: operationId,
+          entity: origOp.details.entity || "",
+          reason,
+          cancelledBy,
+          endDate,
+        },
+        performedBy: cancelledBy,
+        assignmentStatus: "منتهي",
+      };
+
+      setData({
+        ...sharedData,
+        operations: [
+          cancelOp,
+          ...sharedData.operations.map((op) =>
+            op.id === operationId ? { ...op, assignmentStatus: "منتهي" as const } : op
+          ),
+        ],
+        guards: guard
+          ? sharedData.guards.map((g) =>
+              g.id === guard.id
+                ? {
+                    ...g,
+                    schoolId: g.previousSchoolId !== undefined ? g.previousSchoolId : g.schoolId,
+                    schoolName: g.previousSchoolName !== undefined ? g.previousSchoolName : g.schoolName,
+                    previousSchoolId: undefined,
+                    previousSchoolName: undefined,
+                  }
+                : g
+            )
+          : sharedData.guards,
+      });
+    },
+    [setData]
+  );
+
   const addGuard = useCallback(
     (guard: Guard, op: Operation) =>
       setData({ ...sharedData, guards: [guard, ...sharedData.guards], operations: [op, ...sharedData.operations] }),
@@ -175,7 +295,22 @@ export function useStore() {
   );
 
   const deleteSchool = useCallback(
-    (id: string) =>
+    (id: string, logEntry?: { username: string; schoolName: string }) => {
+      const logOp: Operation | null = logEntry
+        ? {
+            id: genId(),
+            type: "حذف مدرسة",
+            guardId: null,
+            guardName: logEntry.schoolName,
+            date: new Date().toISOString().split("T")[0],
+            notes: "",
+            createdAt: new Date().toISOString(),
+            details: {
+              schoolName: logEntry.schoolName,
+              deletedBy: logEntry.username,
+            },
+          }
+        : null;
       setData({
         ...sharedData,
         schools: sharedData.schools.filter((s) => s.id !== id),
@@ -183,7 +318,11 @@ export function useStore() {
         guards: sharedData.guards.map((g) =>
           g.schoolId === id ? { ...g, schoolId: null, schoolName: null } : g
         ),
-      }),
+        operations: logOp
+          ? [logOp, ...sharedData.operations]
+          : sharedData.operations,
+      });
+    },
     [setData]
   );
 
@@ -227,6 +366,8 @@ export function useStore() {
     updateTicket,
     deleteTicket,
     addOperation,
+    assignGuard,
+    cancelAssignment,
     addGuard,
     updateGuard,
     addSchool,

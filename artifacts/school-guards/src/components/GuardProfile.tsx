@@ -1,6 +1,6 @@
 import {
   X, User, School, UserCheck, History, AlertTriangle,
-  ArrowLeftRight, UserPlus, Briefcase, Wallet, Pencil,
+  ArrowLeftRight, UserPlus, Briefcase, Wallet, Pencil, Settings2, Trash2,
 } from "lucide-react";
 import type { Guard, School as SchoolType, Operation, OperationType } from "../types";
 import { useStore } from "../store/useStore";
@@ -33,6 +33,11 @@ const OP_ICONS: Record<OperationType, React.ReactNode> = {
   "تكليف حارس": <Briefcase className="w-3.5 h-3.5" />,
   "بدل حارس": <Wallet className="w-3.5 h-3.5" />,
   "تعديل بيانات": <Pencil className="w-3.5 h-3.5" />,
+  "إلغاء تكليف": <X className="w-3.5 h-3.5" />,
+  "إنهاء نقل": <ArrowLeftRight className="w-3.5 h-3.5" />,
+  "إنهاء تكليف": <X className="w-3.5 h-3.5" />,
+  "حذف مدرسة": <Trash2 className="w-3.5 h-3.5" />,
+  "أخرى": <Settings2 className="w-3.5 h-3.5" />,
 };
 
 const OP_COLORS: Record<OperationType, string> = {
@@ -41,6 +46,11 @@ const OP_COLORS: Record<OperationType, string> = {
   "تكليف حارس": "bg-amber-50 text-amber-700",
   "بدل حارس": "bg-teal-50 text-teal-700",
   "تعديل بيانات": "bg-purple-50 text-purple-700",
+  "إلغاء تكليف": "bg-rose-50 text-rose-700",
+  "إنهاء نقل": "bg-orange-50 text-orange-700",
+  "إنهاء تكليف": "bg-red-50 text-red-700",
+  "حذف مدرسة": "bg-red-50 text-red-700",
+  "أخرى": "bg-gray-50 text-gray-600",
 };
 
 const VIOLATION_STATUS_COLORS: Record<string, string> = {

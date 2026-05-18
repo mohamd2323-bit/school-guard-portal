@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
-import { useStore } from "../store/useStore";
+import { useStore, getBackupSnapshot, saveBackupSnapshot, restoreBackupSnapshot } from "../store/useStore";
 import type { Guard, School, ImportSummary } from "../types";
 import {
   Upload,
@@ -15,6 +15,8 @@ import {
   File,
   Save,
   Ban,
+  RotateCcw,
+  DatabaseBackup,
 } from "lucide-react";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -370,6 +372,42 @@ export default function DataManagement() {
   const [dragOver, setDragOver] = useState(false);
   const singleRef = useRef<HTMLInputElement>(null);
 
+  const [backupSaveMsg, setBackupSaveMsg] = useState<"success" | "error" | null>(null);
+  const [backupRestoreMsg, setBackupRestoreMsg] = useState<"success" | "noBackup" | null>(null);
+
+  const lastBackup = getBackupSnapshot();
+
+  function handleSaveBackup() {
+    try {
+      saveBackupSnapshot();
+      setBackupSaveMsg("success");
+      setTimeout(() => setBackupSaveMsg(null), 4000);
+    } catch {
+      setBackupSaveMsg("error");
+      setTimeout(() => setBackupSaveMsg(null), 4000);
+    }
+  }
+
+  function handleRestoreBackup() {
+    const ok = restoreBackupSnapshot();
+    if (ok) {
+      setBackupRestoreMsg("success");
+      setTimeout(() => setBackupRestoreMsg(null), 4000);
+    } else {
+      setBackupRestoreMsg("noBackup");
+      setTimeout(() => setBackupRestoreMsg(null), 4000);
+    }
+  }
+
+  function formatBackupDate(iso: string) {
+    try {
+      return new Date(iso).toLocaleString("ar-SA", {
+        year: "numeric", month: "short", day: "numeric",
+        hour: "2-digit", minute: "2-digit",
+      });
+    } catch { return iso; }
+  }
+
   // Dual-mode state
   const [schoolsFile, setSchoolsFile] = useState<File | null>(null);
   const [guardsFile, setGuardsFile] = useState<File | null>(null);
@@ -537,6 +575,68 @@ export default function DataManagement() {
         </div>
       </div>
 
+      {/* ── Backup / Restore card ── */}
+      <div className="bg-white rounded-xl border border-teal-200 p-5 space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <DatabaseBackup className="w-5 h-5 text-teal-600 flex-shrink-0" />
+          <p className="font-semibold text-foreground text-sm">حفظ البيانات واستعادتها</p>
+        </div>
+
+        {lastBackup && (
+          <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
+            آخر نسخة محفوظة:{" "}
+            <span className="font-semibold text-foreground">{formatBackupDate(lastBackup.timestamp)}</span>
+            {" — "}
+            {(lastBackup.data.guards?.length ?? 0)} حارس،{" "}
+            {(lastBackup.data.schools?.length ?? 0)} مدرسة،{" "}
+            {(lastBackup.data.operations?.length ?? 0)} عملية
+          </p>
+        )}
+
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={handleSaveBackup}
+            className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-sm"
+          >
+            <Save className="w-4 h-4" />
+            حفظ البيانات
+          </button>
+          <button
+            onClick={handleRestoreBackup}
+            disabled={!lastBackup}
+            className="flex items-center gap-2 bg-white border border-teal-300 text-teal-700 hover:bg-teal-50 disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+          >
+            <RotateCcw className="w-4 h-4" />
+            استعادة آخر نسخة
+          </button>
+        </div>
+
+        {backupSaveMsg === "success" && (
+          <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-sm text-green-800">
+            <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+            تم حفظ البيانات بنجاح
+          </div>
+        )}
+        {backupSaveMsg === "error" && (
+          <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-sm text-red-800">
+            <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+            حدث خطأ أثناء الحفظ
+          </div>
+        )}
+        {backupRestoreMsg === "success" && (
+          <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-sm text-green-800">
+            <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+            تم استعادة البيانات بنجاح
+          </div>
+        )}
+        {backupRestoreMsg === "noBackup" && (
+          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-sm text-amber-800">
+            <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+            لا توجد نسخة محفوظة بعد — احفظ أولاً
+          </div>
+        )}
+      </div>
+
       {/* Instructions */}
       <div className="bg-primary/5 border border-primary/20 rounded-xl p-5">
         <div className="flex items-start gap-3">
@@ -556,7 +656,7 @@ export default function DataManagement() {
       {/* Mode toggle */}
       <div className="bg-white rounded-2xl border border-border p-2 flex gap-2">
         <button
-          onClick={() => { setMode("single"); setSummary(null); }}
+          onClick={() => { setMode("single"); setPending(null); }}
           className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all
             ${mode === "single" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted/50"}`}
         >
@@ -564,7 +664,7 @@ export default function DataManagement() {
           ملف واحد (ورقتان)
         </button>
         <button
-          onClick={() => { setMode("dual"); setSummary(null); }}
+          onClick={() => { setMode("dual"); setPending(null); }}
           className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all
             ${mode === "dual" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted/50"}`}
         >
@@ -761,7 +861,7 @@ export default function DataManagement() {
               onClick={() => {
                 if (confirm("هل أنت متأكد من حذف البيانات المستوردة؟ لا يمكن التراجع عن هذا الإجراء.")) {
                   clearData();
-                  setSummary(null);
+                  setPending(null);
                 }
               }}
               className="flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors border border-red-200"

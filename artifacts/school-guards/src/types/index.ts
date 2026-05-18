@@ -26,6 +26,8 @@ export interface Guard {
   region?: string;
   governorate?: string;
   isDemo?: boolean;
+  previousSchoolId?: string | null;
+  previousSchoolName?: string | null;
 }
 
 export type NeedStatus = "جديد" | "تحت الإجراء" | "تم التغطية" | "مغلق";
@@ -79,6 +81,8 @@ export type OperationType =
   | "تعديل بيانات"
   | "إلغاء تكليف"
   | "إنهاء نقل"
+  | "إنهاء تكليف"
+  | "حذف مدرسة"
   | "أخرى";
 
 export interface Operation {
@@ -91,6 +95,7 @@ export interface Operation {
   createdAt: string;
   details: Record<string, string>;
   performedBy?: string;
+  assignmentStatus?: "نشط" | "منتهي";
 }
 
 export type ViolationStatus = "جديد" | "تحت الإجراء" | "مغلق";

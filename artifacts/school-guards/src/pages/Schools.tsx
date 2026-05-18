@@ -1,9 +1,10 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useStore } from "../store/useStore";
+import { useUsers } from "../store/useUsers";
 import {
   Search, School as SchoolIcon, FolderOpen, AlertTriangle,
   UserPlus, Briefcase, ClipboardList, X, Shield,
-  Plus, Pencil, Trash2,
+  Plus, Pencil, Trash2, Lock, Eye, EyeOff,
 } from "lucide-react";
 import SchoolProfile from "../components/SchoolProfile";
 import type { School, Guard, Need, NeedType, Operation } from "../types";
@@ -497,12 +498,17 @@ type ActionModal = { type: "assign" | "temp" | "need"; school: School };
 
 export default function Schools() {
   const { schools, guards, addSchool, updateSchool, deleteSchool } = useStore();
+  const { currentUser, isAdmin } = useUsers();
   const [search, setSearch] = useState("");
   const [guardFilter, setGuardFilter] = useState<GuardFilter>("all");
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [actionModal, setActionModal] = useState<ActionModal | null>(null);
   const [formModal, setFormModal] = useState<{ mode: "add" } | { mode: "edit"; school: School } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<School | null>(null);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deletePasswordError, setDeletePasswordError] = useState("");
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
+  const [unauthorizedMsg, setUnauthorizedMsg] = useState<string | null>(null);
 
   const guardCountMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -550,11 +556,31 @@ export default function Schools() {
     setFormModal(null);
   }
 
-  function handleDelete() {
-    if (deleteTarget) {
-      deleteSchool(deleteTarget.id);
-      setDeleteTarget(null);
+  function openDeleteDialog(school: School) {
+    if (!isAdmin) {
+      setUnauthorizedMsg("غير مصرح لك بحذف المدارس");
+      setTimeout(() => setUnauthorizedMsg(null), 3000);
+      return;
     }
+    setDeleteTarget(school);
+    setDeletePassword("");
+    setDeletePasswordError("");
+    setShowDeletePassword(false);
+  }
+
+  function handleDelete() {
+    if (!deleteTarget || !currentUser) return;
+    if (deletePassword !== currentUser.password) {
+      setDeletePasswordError("كلمة المرور غير صحيحة");
+      return;
+    }
+    deleteSchool(deleteTarget.id, {
+      username: currentUser.username,
+      schoolName: deleteTarget.name,
+    });
+    setDeleteTarget(null);
+    setDeletePassword("");
+    setDeletePasswordError("");
   }
 
   return (
@@ -746,15 +772,26 @@ export default function Schools() {
                             تعديل
                           </button>
 
-                          {/* حذف */}
-                          <button
-                            onClick={() => setDeleteTarget(school)}
-                            title="حذف المدرسة"
-                            className="flex items-center gap-1 text-xs bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 px-2 py-1.5 rounded-lg transition-colors font-semibold"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            حذف
-                          </button>
+                          {/* حذف — مدير النظام فقط */}
+                          {isAdmin ? (
+                            <button
+                              onClick={() => openDeleteDialog(school)}
+                              title="حذف المدرسة"
+                              className="flex items-center gap-1 text-xs bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 px-2 py-1.5 rounded-lg transition-colors font-semibold"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              حذف
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => openDeleteDialog(school)}
+                              title="غير مصرح لك بحذف المدارس"
+                              className="flex items-center gap-1 text-xs bg-gray-50 text-gray-400 border border-gray-200 px-2 py-1.5 rounded-lg cursor-not-allowed font-semibold"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              حذف
+                            </button>
+                          )}
 
                           {/* No-guard quick actions */}
                           {noGuard && (
@@ -810,10 +847,19 @@ export default function Schools() {
         />
       )}
 
-      {/* Delete confirmation */}
+      {/* Unauthorized toast */}
+      {unauthorizedMsg && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-red-600 text-white text-sm font-semibold px-5 py-3 rounded-xl shadow-xl flex items-center gap-2" dir="rtl">
+          <Shield className="w-4 h-4 flex-shrink-0" />
+          {unauthorizedMsg}
+        </div>
+      )}
+
+      {/* Delete confirmation — admin + password required */}
       {deleteTarget && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" dir="rtl">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            {/* Header */}
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
                 <Trash2 className="w-5 h-5 text-red-600" />
@@ -823,30 +869,82 @@ export default function Schools() {
                 <p className="text-muted-foreground text-xs mt-0.5">هذا الإجراء لا يمكن التراجع عنه</p>
               </div>
             </div>
+
+            {/* School name */}
             <p className="text-sm text-foreground">
               هل أنت متأكد من حذف مدرسة{" "}
               <span className="font-bold text-red-700">«{deleteTarget.name}»</span>؟
             </p>
-            {(() => {
-              const linkedCount = guardCountMap.get(deleteTarget.id) ?? 0;
-              return linkedCount > 0 ? (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm">
-                  <p className="text-amber-800 font-semibold">تنبيه: {linkedCount} حارس مرتبط بهذه المدرسة</p>
-                  <p className="text-amber-700 text-xs mt-1">
-                    لن يُحذف الحراس — سيُفكّ ارتباطهم بالمدرسة فقط.
-                  </p>
+
+            {/* Guards warning */}
+            {(guardCountMap.get(deleteTarget.id) ?? 0) > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm">
+                <p className="text-amber-800 font-semibold">
+                  تنبيه: {guardCountMap.get(deleteTarget.id)} حارس مرتبط بهذه المدرسة
+                </p>
+                <p className="text-amber-700 text-xs mt-1">
+                  لن يُحذف الحراس — سيُفكّ ارتباطهم بالمدرسة فقط.
+                </p>
+              </div>
+            )}
+
+            {/* Password confirmation */}
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
+              <div className="flex items-center gap-2 text-xs text-gray-600 font-semibold">
+                <Lock className="w-3.5 h-3.5" />
+                تأكيد هوية مدير النظام
+              </div>
+
+              {/* Username — read-only */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">اسم المستخدم</label>
+                <input
+                  type="text"
+                  value={currentUser?.username ?? ""}
+                  readOnly
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-muted/40 text-sm text-muted-foreground cursor-not-allowed"
+                />
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">كلمة المرور</label>
+                <div className="relative">
+                  <input
+                    type={showDeletePassword ? "text" : "password"}
+                    value={deletePassword}
+                    onChange={(e) => { setDeletePassword(e.target.value); setDeletePasswordError(""); }}
+                    placeholder="أدخل كلمة المرور"
+                    className={`w-full px-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 ${deletePasswordError ? "border-red-400 bg-red-50" : "border-border"}`}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleDelete(); }}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowDeletePassword((v) => !v)}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    tabIndex={-1}
+                  >
+                    {showDeletePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
-              ) : null;
-            })()}
+                {deletePasswordError && (
+                  <p className="text-red-600 text-xs mt-1 font-semibold">{deletePasswordError}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Actions */}
             <div className="flex gap-3 pt-1">
               <button
                 onClick={handleDelete}
-                className="flex-1 bg-red-600 text-white py-2.5 rounded-xl text-sm font-bold hover:bg-red-700 transition-colors"
+                disabled={!deletePassword}
+                className="flex-1 bg-red-600 text-white py-2.5 rounded-xl text-sm font-bold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 تأكيد الحذف
               </button>
               <button
-                onClick={() => setDeleteTarget(null)}
+                onClick={() => { setDeleteTarget(null); setDeletePassword(""); setDeletePasswordError(""); }}
                 className="flex-1 bg-muted text-foreground py-2.5 rounded-xl text-sm font-semibold hover:bg-muted/80 transition-colors"
               >
                 إلغاء

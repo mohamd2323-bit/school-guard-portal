@@ -295,7 +295,7 @@ function AddModal({ schools, guards, onClose, onSave }: {
             </div>
             <div className="col-span-2 sm:col-span-1">
               <SelectField label="جهة البلاغ" value={reporterSource} options={REPORTER_SOURCES}
-                onChange={setReporterSource} required />
+                onChange={(v) => setReporterSource(v as ReporterSource)} required />
             </div>
           </div>
 
@@ -353,7 +353,7 @@ function AddModal({ schools, guards, onClose, onSave }: {
                 className="w-full px-3 py-2.5 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
             </div>
             <SelectField label="حالة المعالجة" value={status} options={ALL_STATUSES}
-              onChange={setStatus} required />
+              onChange={(v) => setStatus(v as ViolationStatus)} required />
           </div>
 
           {/* Action taken */}
