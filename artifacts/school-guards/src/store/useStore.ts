@@ -28,6 +28,7 @@ export interface BackupSnapshot {
   timestamp: string;
   data: AppData;
   users: string | null;
+  label?: string;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -148,11 +149,12 @@ export function getBackupSnapshots(): BackupSnapshot[] {
   return sharedBackups;
 }
 
-export function saveBackupSnapshot(): BackupSnapshot {
+export function saveBackupSnapshot(label?: string): BackupSnapshot {
   const snapshot: BackupSnapshot = {
     timestamp: new Date().toISOString(),
     data: { ...sharedData },
     users: null, // employees live in the shared DB already
+    ...(label?.trim() ? { label: label.trim() } : {}),
   };
   sharedBackups = [snapshot, ...sharedBackups].slice(0, MAX_SNAPSHOTS);
   void apiPut("/api/backups", sharedBackups);

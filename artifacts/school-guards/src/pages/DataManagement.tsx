@@ -378,6 +378,9 @@ export default function DataManagement() {
   const [restoredIndex, setRestoredIndex] = useState<number | null>(null);
   const snapshots = useBackups();
 
+  const [showLabelInput, setShowLabelInput] = useState(false);
+  const [backupLabel, setBackupLabel] = useState("");
+
   const [showExportPanel, setShowExportPanel] = useState(false);
   const [exportSheets, setExportSheets] = useState({
     guards: true,
@@ -391,10 +394,12 @@ export default function DataManagement() {
     setExportSheets((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
-  function handleSaveBackup() {
+  function handleSaveBackup(label: string) {
     try {
-      saveBackupSnapshot();
+      saveBackupSnapshot(label);
       setBackupSaveMsg("success");
+      setShowLabelInput(false);
+      setBackupLabel("");
       setTimeout(() => setBackupSaveMsg(null), 4000);
     } catch {
       setBackupSaveMsg("error");
@@ -707,9 +712,44 @@ export default function DataManagement() {
           )}
         </div>
 
-        <div className="flex flex-wrap gap-3">
+        {showLabelInput ? (
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-semibold text-teal-800">
+              تسمية النسخة (اختياري)
+            </label>
+            <div className="flex flex-wrap gap-2 items-center">
+              <input
+                type="text"
+                value={backupLabel}
+                onChange={(e) => setBackupLabel(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveBackup(backupLabel);
+                  if (e.key === "Escape") { setShowLabelInput(false); setBackupLabel(""); }
+                }}
+                placeholder="مثال: قبل استيراد ملف يناير"
+                maxLength={80}
+                autoFocus
+                className="flex-1 min-w-0 border border-teal-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white placeholder:text-muted-foreground/60"
+              />
+              <button
+                onClick={() => handleSaveBackup(backupLabel)}
+                className="flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm flex-shrink-0"
+              >
+                <Save className="w-4 h-4" />
+                حفظ
+              </button>
+              <button
+                onClick={() => { setShowLabelInput(false); setBackupLabel(""); }}
+                className="px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted/50 border border-border transition-colors flex-shrink-0"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-3">
           <button
-            onClick={handleSaveBackup}
+            onClick={() => setShowLabelInput(true)}
             className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-sm"
           >
             <Save className="w-4 h-4" />
@@ -730,6 +770,7 @@ export default function DataManagement() {
             تصدير كامل
           </button>
         </div>
+        )}
 
         {/* Export record count summary — always visible when there is data */}
         {hasExportData && (
@@ -851,17 +892,35 @@ export default function DataManagement() {
                   <div className="flex items-center gap-3 min-w-0">
                     <div className={`w-2 h-2 rounded-full flex-shrink-0 ${i === 0 ? "bg-teal-500" : "bg-border"}`} />
                     <div className="min-w-0">
-                      <p className="font-semibold text-foreground text-xs truncate">
-                        {formatBackupDate(snap.timestamp)}
-                        {i === 0 && (
-                          <span className="mr-2 text-teal-600 font-medium">(الأحدث)</span>
-                        )}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {(snap.data.guards?.length ?? 0)} حارس ·{" "}
-                        {(snap.data.schools?.length ?? 0)} مدرسة ·{" "}
-                        {(snap.data.operations?.length ?? 0)} عملية
-                      </p>
+                      {snap.label ? (
+                        <>
+                          <p className="font-semibold text-foreground text-xs truncate">
+                            {snap.label}
+                            {i === 0 && (
+                              <span className="mr-2 text-teal-600 font-medium">(الأحدث)</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {formatBackupDate(snap.timestamp)} · {(snap.data.guards?.length ?? 0)} حارس ·{" "}
+                            {(snap.data.schools?.length ?? 0)} مدرسة ·{" "}
+                            {(snap.data.operations?.length ?? 0)} عملية
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-semibold text-foreground text-xs truncate">
+                            {formatBackupDate(snap.timestamp)}
+                            {i === 0 && (
+                              <span className="mr-2 text-teal-600 font-medium">(الأحدث)</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {(snap.data.guards?.length ?? 0)} حارس ·{" "}
+                            {(snap.data.schools?.length ?? 0)} مدرسة ·{" "}
+                            {(snap.data.operations?.length ?? 0)} عملية
+                          </p>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
