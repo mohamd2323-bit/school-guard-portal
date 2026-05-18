@@ -52,14 +52,13 @@ async function apiGet<T>(path: string, fallback: T): Promise<T> {
 }
 
 async function apiPut(path: string, body: unknown): Promise<void> {
-  try {
-    await fetch(path, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-  } catch (err) {
-    console.error(`PUT ${path} failed:`, err);
+  const res = await fetch(path, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} on PUT ${path}`);
   }
 }
 
@@ -110,9 +109,15 @@ let sharedData: AppData = { ...EMPTY_DATA };
 let sharedBackups: BackupSnapshot[] = [];
 let sharedLoading = true;
 let fetchStarted = false;
+let sharedSaveError: string | null = null;
 
 function notifyAll() {
   listeners.forEach((fn) => fn());
+}
+
+function setSaveError(msg: string | null) {
+  sharedSaveError = msg;
+  notifyAll();
 }
 
 async function initData() {
@@ -186,6 +191,19 @@ export function useBackups(): BackupSnapshot[] {
   return sharedBackups;
 }
 
+/** Returns the last save-error message, or null when saves are succeeding. */
+export function useSaveError() {
+  const [, forceUpdate] = useState(0);
+  useEffect(() => {
+    const listener = () => forceUpdate((n) => n + 1);
+    listeners.push(listener);
+    return () => {
+      listeners = listeners.filter((l) => l !== listener);
+    };
+  }, []);
+  return { error: sharedSaveError, dismiss: () => setSaveError(null) };
+}
+
 /** Returns true while the initial API fetch is in progress. */
 export function useAppLoading() {
   const [loading, setLoading] = useState(sharedLoading);
@@ -219,8 +237,13 @@ export function useStore() {
 
   const setData = useCallback((data: AppData) => {
     sharedData = data;
-    void saveDataToApi(data);
     notifyAll();
+    saveDataToApi(data)
+      .then(() => { if (sharedSaveError) setSaveError(null); })
+      .catch((err: unknown) => {
+        console.error("Save failed:", err);
+        setSaveError("فشل حفظ البيانات في قاعدة البيانات. يرجى التحقق من الاتصال.");
+      });
   }, []);
 
   // ── Import / demo ──────────────────────────────────────────────────────────

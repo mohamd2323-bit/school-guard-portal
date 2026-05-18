@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { useSaveError } from "../store/useStore";
 import {
   LayoutDashboard,
   ShieldCheck,
@@ -28,6 +29,20 @@ const navItems = [
   { href: "/data", label: "إدارة البيانات", icon: Database },
   { href: "/users", label: "صلاحيات الموظفين", icon: Users },
 ];
+
+function SaveErrorBanner() {
+  const { error, dismiss } = useSaveError();
+  if (!error) return null;
+  return (
+    <div className="bg-red-50 border-b border-red-200 px-6 py-2 flex items-center gap-3 text-sm text-red-700" dir="rtl">
+      <AlertTriangle className="w-4 h-4 flex-shrink-0 text-red-500" />
+      <span className="flex-1">{error}</span>
+      <button onClick={dismiss} className="flex-shrink-0 hover:text-red-900" aria-label="إغلاق">
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -133,6 +148,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             )?.label ?? "بوابة الحراسات المدرسية"}
           </h1>
         </header>
+        <SaveErrorBanner />
         <main className="flex-1 p-6">{children}</main>
       </div>
     </div>
