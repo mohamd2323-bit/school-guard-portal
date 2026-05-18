@@ -20,6 +20,7 @@ interface FilterState {
   rank: string;
   jobType: string;
   status: string;
+  assignment: string;
 }
 
 const EMPTY_FILTERS: FilterState = {
@@ -30,6 +31,7 @@ const EMPTY_FILTERS: FilterState = {
   rank: "",
   jobType: "",
   status: "",
+  assignment: "",
 };
 
 function hasActiveFilters(f: FilterState) {
@@ -144,6 +146,11 @@ export default function Guards() {
       const matchRank = !filters.rank || g.rank === filters.rank;
       const matchJobType = !filters.jobType || g.jobType === filters.jobType;
       const matchStatus = !filters.status || g.status === filters.status;
+      const isAssigned = assignedGuardIds.has(g.id);
+      const matchAssignment =
+        !filters.assignment ||
+        (filters.assignment === "مكلف" && isAssigned) ||
+        (filters.assignment === "غير مكلف" && !isAssigned);
 
       return (
         matchSearch &&
@@ -153,10 +160,11 @@ export default function Guards() {
         matchJobTitle &&
         matchRank &&
         matchJobType &&
-        matchStatus
+        matchStatus &&
+        matchAssignment
       );
     });
-  }, [guards, search, filters]);
+  }, [guards, search, filters, assignedGuardIds]);
 
   const selectedSchool = selectedGuard
     ? schools.find((s) => s.id === selectedGuard.schoolId) || null
@@ -255,6 +263,12 @@ export default function Guards() {
               value={filters.status}
               options={options.status.length ? options.status : ["نشط", "غير نشط"]}
               onChange={(v) => setFilter("status", v)}
+            />
+            <FilterSelect
+              label="التكليف"
+              value={filters.assignment}
+              options={["مكلف", "غير مكلف"]}
+              onChange={(v) => setFilter("assignment", v)}
             />
           </div>
 
