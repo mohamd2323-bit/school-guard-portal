@@ -727,6 +727,34 @@ export default function DataManagement() {
           </button>
         </div>
 
+        {/* Export record count summary — always visible when there is data */}
+        {hasExportData && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 bg-teal-50/70 border border-teal-100 rounded-xl px-4 py-2.5">
+            <Info className="w-3.5 h-3.5 text-teal-500 flex-shrink-0" />
+            {(
+              [
+                { label: "حارس", emptyLabel: "لا يوجد حراس", count: guards.length },
+                { label: "مدرسة", emptyLabel: "لا توجد مدارس", count: schools.length },
+                { label: "عملية", emptyLabel: "لا توجد عمليات", count: operations.length },
+                { label: "احتياج", emptyLabel: "لا توجد احتياجات", count: needs.length },
+                { label: "مخالفة", emptyLabel: "لا توجد مخالفات", count: violations.length },
+              ] as { label: string; emptyLabel: string; count: number }[]
+            ).map(({ label, emptyLabel, count }, i, arr) => (
+              <span key={label} className="flex items-center gap-1">
+                {count > 0 ? (
+                  <>
+                    <span className="font-bold text-teal-800 text-sm">{count}</span>
+                    <span className="text-teal-700 text-xs">{label}</span>
+                  </>
+                ) : (
+                  <span className="text-muted-foreground text-xs">{emptyLabel}</span>
+                )}
+                {i < arr.length - 1 && <span className="text-teal-300 text-xs mx-0.5">·</span>}
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Export sheet selector panel */}
         {showExportPanel && (
           <div className="bg-teal-50/60 border border-teal-200 rounded-xl p-4 space-y-3">
@@ -753,7 +781,11 @@ export default function DataManagement() {
                     className="accent-teal-600 w-4 h-4 flex-shrink-0"
                   />
                   <span className="text-sm font-medium flex-1">{label}</span>
-                  <span className="text-xs text-muted-foreground">{count}</span>
+                  {count > 0 ? (
+                    <span className="text-xs font-semibold bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-md">{count}</span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground/70 italic">فارغة</span>
+                  )}
                 </label>
               ))}
             </div>
