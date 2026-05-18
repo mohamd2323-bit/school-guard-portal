@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearch } from "wouter";
 import { useStore } from "../store/useStore";
 import GuardProfile from "../components/GuardProfile";
 import type { Guard } from "../types";
@@ -92,11 +93,16 @@ function FilterSelect({
 
 export default function Guards() {
   const { guards, schools, operations } = useStore();
+  const searchString = useSearch();
 
   const assignedGuardIds = useMemo(() => {
     const ids = new Set<string>();
     operations.forEach((op) => {
-      if (op.type === "تكليف حارس" && op.assignmentStatus === "نشط" && op.guardId) {
+      if (
+        op.type === "تكليف حارس" &&
+        op.guardId &&
+        (op.assignmentStatus === "نشط" || op.assignmentStatus === undefined)
+      ) {
         ids.add(op.guardId);
       }
     });
@@ -105,6 +111,15 @@ export default function Guards() {
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(true);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const assignment = params.get("assignment");
+    if (assignment === "مكلف" || assignment === "غير مكلف") {
+      setFilters((prev) => ({ ...prev, assignment }));
+      setFiltersOpen(true);
+    }
+  }, [searchString]);
   const [selectedGuard, setSelectedGuard] = useState<Guard | null>(null);
 
   // Derive unique option lists from real data

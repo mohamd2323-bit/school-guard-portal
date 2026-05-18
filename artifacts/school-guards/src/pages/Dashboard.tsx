@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import {
   Users, School, UserCheck, UserX, AlertTriangle,
   ShieldCheck, Briefcase, Wallet, ChevronDown, BarChart2,
@@ -47,14 +48,19 @@ function govLabel(g: Guard) {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StatCard({
-  label, value, icon: Icon, bg, iconColor, border,
+  label, value, icon: Icon, bg, iconColor, border, onClick,
 }: {
   label: string; value: number;
   icon: React.ElementType;
   bg: string; iconColor: string; border: string;
+  onClick?: () => void;
 }) {
+  const Wrapper = onClick ? "button" : "div";
   return (
-    <div className={`bg-white rounded-2xl border ${border} p-5 flex items-center gap-4 shadow-sm`}>
+    <Wrapper
+      className={`bg-white rounded-2xl border ${border} p-5 flex items-center gap-4 shadow-sm w-full text-right${onClick ? " hover:shadow-md hover:scale-[1.02] transition-all cursor-pointer active:scale-100" : ""}`}
+      {...(onClick ? { onClick } : {})}
+    >
       <div className={`w-14 h-14 rounded-2xl ${bg} flex items-center justify-center flex-shrink-0`}>
         <Icon className={`w-7 h-7 ${iconColor}`} />
       </div>
@@ -64,7 +70,7 @@ function StatCard({
           {value.toLocaleString("ar-SA")}
         </p>
       </div>
-    </div>
+    </Wrapper>
   );
 }
 
@@ -212,6 +218,7 @@ function DonutChart({ data, colorMap }: {
 
 export default function Dashboard() {
   const { guards, schools, operations } = useStore();
+  const [, navigate] = useLocation();
 
   const [filterGov, setFilterGov] = useState("");
   const [filterGender, setFilterGender] = useState("");
@@ -309,14 +316,21 @@ export default function Dashboard() {
 
   const hasFilters = filterGov || filterGender || filterStatus || filterJob;
 
-  const statCards = [
+  const statCards: {
+    label: string; value: number; icon: React.ElementType;
+    bg: string; iconColor: string; border: string; onClick?: () => void;
+  }[] = [
     { label: "إجمالي الحراس", value: stats.total, icon: Users, bg: "bg-teal-50", iconColor: "text-teal-600", border: "border-teal-200" },
     { label: "إجمالي المدارس", value: stats.schools, icon: School, bg: "bg-blue-50", iconColor: "text-blue-600", border: "border-blue-200" },
     { label: "الحراس الذكور", value: stats.male, icon: UserCheck, bg: "bg-indigo-50", iconColor: "text-indigo-600", border: "border-indigo-200" },
     { label: "الحارسات الإناث", value: stats.female, icon: UserX, bg: "bg-pink-50", iconColor: "text-pink-600", border: "border-pink-200" },
     { label: "مدارس بدون حارس", value: stats.schoolsNoGuard, icon: AlertTriangle, bg: "bg-orange-50", iconColor: "text-orange-600", border: "border-orange-200" },
     { label: "الحراس على رأس العمل", value: stats.active, icon: ShieldCheck, bg: "bg-emerald-50", iconColor: "text-emerald-600", border: "border-emerald-200" },
-    { label: "الحراس المكلفون", value: stats.delegated, icon: Briefcase, bg: "bg-amber-50", iconColor: "text-amber-600", border: "border-amber-200" },
+    {
+      label: "الحراس المكلفون", value: stats.delegated, icon: Briefcase,
+      bg: "bg-amber-50", iconColor: "text-amber-600", border: "border-amber-200",
+      onClick: () => navigate("/guards?assignment=مكلف"),
+    },
     { label: "الحراس الذين يتقاضون بدل", value: stats.allowance, icon: Wallet, bg: "bg-purple-50", iconColor: "text-purple-600", border: "border-purple-200" },
   ];
 
