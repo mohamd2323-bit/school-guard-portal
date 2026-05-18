@@ -46,11 +46,13 @@ function FilterSelect({
   value,
   options,
   onChange,
+  optionCounts,
 }: {
   label: string;
   value: string;
   options: string[];
   onChange: (v: string) => void;
+  optionCounts?: Record<string, number>;
 }) {
   const active = value !== "";
   return (
@@ -65,7 +67,9 @@ function FilterSelect({
         >
           <option value="">الكل</option>
           {options.map((o) => (
-            <option key={o} value={o}>{o}</option>
+            <option key={o} value={o}>
+              {optionCounts !== undefined ? `${o} (${(optionCounts[o] ?? 0).toLocaleString("ar-SA")})` : o}
+            </option>
           ))}
         </select>
         {active && (
@@ -181,6 +185,35 @@ export default function Guards() {
     });
   }, [guards, search, filters, assignedGuardIds]);
 
+  // Counts for the assignment filter options, based on all other active filters
+  const assignmentCounts = useMemo(() => {
+    let assigned = 0;
+    let unassigned = 0;
+    guards.forEach((g) => {
+      const q = search.trim();
+      const matchSearch =
+        !q ||
+        g.name.includes(q) ||
+        g.nationalId.includes(q) ||
+        g.phone.includes(q) ||
+        (g.schoolName || "").includes(q) ||
+        (g.jobType || "").includes(q) ||
+        (g.rank || "").includes(q);
+      const matchGovernorate = !filters.governorate || g.governorate === filters.governorate;
+      const matchSchool = !filters.schoolName || g.schoolName === filters.schoolName;
+      const matchGender = !filters.gender || g.gender === filters.gender;
+      const matchJobTitle = !filters.jobTitle || g.jobTitle === filters.jobTitle;
+      const matchRank = !filters.rank || g.rank === filters.rank;
+      const matchJobType = !filters.jobType || g.jobType === filters.jobType;
+      const matchStatus = !filters.status || g.status === filters.status;
+      if (matchSearch && matchGovernorate && matchSchool && matchGender && matchJobTitle && matchRank && matchJobType && matchStatus) {
+        if (assignedGuardIds.has(g.id)) assigned++;
+        else unassigned++;
+      }
+    });
+    return { "مكلف": assigned, "غير مكلف": unassigned };
+  }, [guards, search, filters, assignedGuardIds]);
+
   const selectedSchool = selectedGuard
     ? schools.find((s) => s.id === selectedGuard.schoolId) || null
     : null;
@@ -284,6 +317,7 @@ export default function Guards() {
               value={filters.assignment}
               options={["مكلف", "غير مكلف"]}
               onChange={(v) => setFilter("assignment", v)}
+              optionCounts={assignmentCounts}
             />
           </div>
 
