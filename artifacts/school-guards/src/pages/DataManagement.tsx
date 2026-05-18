@@ -378,6 +378,19 @@ export default function DataManagement() {
   const [restoredIndex, setRestoredIndex] = useState<number | null>(null);
   const snapshots = useBackups();
 
+  const [showExportPanel, setShowExportPanel] = useState(false);
+  const [exportSheets, setExportSheets] = useState({
+    guards: true,
+    schools: true,
+    operations: true,
+    needs: true,
+    violations: true,
+  });
+
+  function toggleExportSheet(key: keyof typeof exportSheets) {
+    setExportSheets((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
   function handleSaveBackup() {
     try {
       saveBackupSnapshot();
@@ -410,85 +423,94 @@ export default function DataManagement() {
     violations.length > 0;
 
   function handleExport() {
+    const anySelected = Object.values(exportSheets).some(Boolean);
+    if (!anySelected) return;
+
     const d = new Date();
     const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const wb = XLSX.utils.book_new();
 
-    // Guards sheet
-    const guardsData = guards.map((g) => ({
-      "الاسم": g.name,
-      "السجل المدني": g.nationalId,
-      "رقم الجوال": g.phone,
-      "الجنس": g.gender,
-      "الحالة": g.status,
-      "نوع الوظيفة": g.jobType ?? "",
-      "المسمى الوظيفي": g.jobTitle ?? "",
-      "المرتبة": g.rank ?? "",
-      "فئة التعيين": g.appointmentCategory ?? "",
-      "المنطقة": g.region ?? "",
-      "المحافظة": g.governorate ?? "",
-      "اسم المدرسة المرتبطة": g.schoolName ?? "",
-    }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(guardsData), "الحراس");
+    if (exportSheets.guards) {
+      const guardsData = guards.map((g) => ({
+        "الاسم": g.name,
+        "السجل المدني": g.nationalId,
+        "رقم الجوال": g.phone,
+        "الجنس": g.gender,
+        "الحالة": g.status,
+        "نوع الوظيفة": g.jobType ?? "",
+        "المسمى الوظيفي": g.jobTitle ?? "",
+        "المرتبة": g.rank ?? "",
+        "فئة التعيين": g.appointmentCategory ?? "",
+        "المنطقة": g.region ?? "",
+        "المحافظة": g.governorate ?? "",
+        "اسم المدرسة المرتبطة": g.schoolName ?? "",
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(guardsData), "الحراس");
+    }
 
-    // Schools sheet
-    const schoolsData = schools.map((s) => ({
-      "اسم المدرسة": s.name,
-      "المحافظة": s.governorate,
-      "المرحلة الدراسية": s.level,
-      "نوع المدرسة": s.type,
-      "اسم المدير/ة": s.principalName,
-      "سجل المدير/ة": s.principalNationalId,
-      "جوال المدير/ة": s.principalPhone,
-    }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(schoolsData), "المدارس");
+    if (exportSheets.schools) {
+      const schoolsData = schools.map((s) => ({
+        "اسم المدرسة": s.name,
+        "المحافظة": s.governorate,
+        "المرحلة الدراسية": s.level,
+        "نوع المدرسة": s.type,
+        "اسم المدير/ة": s.principalName,
+        "سجل المدير/ة": s.principalNationalId,
+        "جوال المدير/ة": s.principalPhone,
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(schoolsData), "المدارس");
+    }
 
-    // Operations sheet
-    const operationsData = operations.map((op) => ({
-      "نوع العملية": op.type,
-      "الحارس": op.guardName,
-      "التاريخ": op.date,
-      "ملاحظات": op.notes,
-      "منفذ بواسطة": op.performedBy ?? "",
-      "حالة التكليف": op.assignmentStatus ?? "",
-      "تاريخ الإنشاء": op.createdAt,
-    }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(operationsData), "العمليات");
+    if (exportSheets.operations) {
+      const operationsData = operations.map((op) => ({
+        "نوع العملية": op.type,
+        "الحارس": op.guardName,
+        "التاريخ": op.date,
+        "ملاحظات": op.notes,
+        "منفذ بواسطة": op.performedBy ?? "",
+        "حالة التكليف": op.assignmentStatus ?? "",
+        "تاريخ الإنشاء": op.createdAt,
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(operationsData), "العمليات");
+    }
 
-    // Needs sheet
-    const needsData = needs.map((n) => ({
-      "اسم المدرسة": n.schoolName,
-      "المحافظة": n.governorate,
-      "اسم المدير/ة": n.principalName,
-      "سجل المدير/ة": n.principalNationalId,
-      "جوال المدير/ة": n.principalPhone,
-      "نوع الحاجة": n.needType,
-      "السبب": n.reason,
-      "تاريخ الطلب": n.requestDate,
-      "الحالة": n.status,
-      "تاريخ الإنشاء": n.createdAt,
-    }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(needsData), "الاحتياجات");
+    if (exportSheets.needs) {
+      const needsData = needs.map((n) => ({
+        "اسم المدرسة": n.schoolName,
+        "المحافظة": n.governorate,
+        "اسم المدير/ة": n.principalName,
+        "سجل المدير/ة": n.principalNationalId,
+        "جوال المدير/ة": n.principalPhone,
+        "نوع الحاجة": n.needType,
+        "السبب": n.reason,
+        "تاريخ الطلب": n.requestDate,
+        "الحالة": n.status,
+        "تاريخ الإنشاء": n.createdAt,
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(needsData), "الاحتياجات");
+    }
 
-    // Violations sheet
-    const violationsData = violations.map((v) => ({
-      "رقم القضية": v.caseNumber,
-      "النوع": v.type,
-      "اسم المبلّغ": v.reporterName,
-      "مصدر البلاغ": v.reporterSource,
-      "اسم المدرسة": v.schoolName,
-      "المحافظة": v.governorate,
-      "اسم الحارس": v.guardName,
-      "الوصف": v.description,
-      "تاريخ الإبلاغ": v.reportDate,
-      "الحالة": v.status,
-      "الإجراء المتخذ": v.actionTaken,
-      "ملاحظات": v.notes,
-      "تاريخ الإنشاء": v.createdAt,
-    }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(violationsData), "المخالفات");
+    if (exportSheets.violations) {
+      const violationsData = violations.map((v) => ({
+        "رقم القضية": v.caseNumber,
+        "النوع": v.type,
+        "اسم المبلّغ": v.reporterName,
+        "مصدر البلاغ": v.reporterSource,
+        "اسم المدرسة": v.schoolName,
+        "المحافظة": v.governorate,
+        "اسم الحارس": v.guardName,
+        "الوصف": v.description,
+        "تاريخ الإبلاغ": v.reportDate,
+        "الحالة": v.status,
+        "الإجراء المتخذ": v.actionTaken,
+        "ملاحظات": v.notes,
+        "تاريخ الإنشاء": v.createdAt,
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(violationsData), "المخالفات");
+    }
 
     XLSX.writeFile(wb, `school-guards-export-${today}.xlsx`);
+    setShowExportPanel(false);
   }
 
   function formatBackupDate(iso: string) {
@@ -690,14 +712,69 @@ export default function DataManagement() {
             حفظ نسخة الآن
           </button>
           <button
-            onClick={handleExport}
+            onClick={() => {
+              if (!showExportPanel) {
+                setExportSheets({ guards: true, schools: true, operations: true, needs: true, violations: true });
+              }
+              setShowExportPanel((v) => !v);
+            }}
             disabled={!hasExportData}
-            className="flex items-center gap-2 bg-white border border-teal-300 text-teal-700 hover:bg-teal-50 disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+            className={`flex items-center gap-2 border px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed
+              ${showExportPanel ? "bg-teal-50 border-teal-400 text-teal-800" : "bg-white border-teal-300 text-teal-700 hover:bg-teal-50"}`}
           >
             <Download className="w-4 h-4" />
             تصدير كامل
           </button>
         </div>
+
+        {/* Export sheet selector panel */}
+        {showExportPanel && (
+          <div className="bg-teal-50/60 border border-teal-200 rounded-xl p-4 space-y-3">
+            <p className="text-sm font-semibold text-teal-900">اختر الأوراق المراد تصديرها:</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {(
+                [
+                  { key: "guards", label: "الحراس", count: guards.length },
+                  { key: "schools", label: "المدارس", count: schools.length },
+                  { key: "operations", label: "العمليات", count: operations.length },
+                  { key: "needs", label: "الاحتياجات", count: needs.length },
+                  { key: "violations", label: "المخالفات", count: violations.length },
+                ] as { key: keyof typeof exportSheets; label: string; count: number }[]
+              ).map(({ key, label, count }) => (
+                <label
+                  key={key}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors select-none
+                    ${exportSheets[key] ? "bg-white border-teal-400 text-teal-900" : "bg-white/60 border-border text-muted-foreground"}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={exportSheets[key]}
+                    onChange={() => toggleExportSheet(key)}
+                    className="accent-teal-600 w-4 h-4 flex-shrink-0"
+                  />
+                  <span className="text-sm font-medium flex-1">{label}</span>
+                  <span className="text-xs text-muted-foreground">{count}</span>
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={handleExport}
+                disabled={!Object.values(exportSheets).some(Boolean)}
+                className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed text-white px-5 py-2 rounded-lg text-sm font-bold transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                تنزيل ({Object.values(exportSheets).filter(Boolean).length} ورقة)
+              </button>
+              <button
+                onClick={() => setShowExportPanel(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-white/80 border border-border transition-colors"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        )}
 
         {backupSaveMsg === "success" && (
           <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-sm text-green-800">
