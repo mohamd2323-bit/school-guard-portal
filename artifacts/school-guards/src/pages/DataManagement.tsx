@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
-import { useStore, getBackupSnapshots, saveBackupSnapshot, restoreBackupSnapshot } from "../store/useStore";
+import { useStore, useBackups, saveBackupSnapshot, restoreBackupSnapshot } from "../store/useStore";
 import type { Guard, School, ImportSummary } from "../types";
 import {
   Upload,
@@ -376,12 +376,11 @@ export default function DataManagement() {
   const [backupSaveMsg, setBackupSaveMsg] = useState<"success" | "error" | null>(null);
   const [backupRestoreMsg, setBackupRestoreMsg] = useState<"success" | "noBackup" | null>(null);
   const [restoredIndex, setRestoredIndex] = useState<number | null>(null);
-  const [snapshots, setSnapshots] = useState(() => getBackupSnapshots());
+  const snapshots = useBackups();
 
   function handleSaveBackup() {
     try {
       saveBackupSnapshot();
-      setSnapshots(getBackupSnapshots());
       setBackupSaveMsg("success");
       setTimeout(() => setBackupSaveMsg(null), 4000);
     } catch {

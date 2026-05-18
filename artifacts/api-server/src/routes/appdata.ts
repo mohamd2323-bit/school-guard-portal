@@ -5,7 +5,7 @@ import { eq, inArray } from "drizzle-orm";
 const router = Router();
 
 const APP_COLLECTIONS = ["guards", "schools", "needs", "tickets", "operations", "violations"] as const;
-const ALL_KEYS = [...APP_COLLECTIONS, "employees"] as const;
+const ALL_KEYS = [...APP_COLLECTIONS, "employees", "backups"] as const;
 
 type CollectionKey = (typeof ALL_KEYS)[number];
 
@@ -134,6 +134,35 @@ router.post("/auth/login", async (req, res) => {
   } catch (err) {
     req.log.error(err, "POST /auth/login failed");
     res.status(500).json({ error: "خطأ في تسجيل الدخول" });
+  }
+});
+
+// ─── Backups ──────────────────────────────────────────────────────────────────
+
+/** GET /api/backups — return all backup snapshots */
+router.get("/backups", async (req, res) => {
+  try {
+    const snapshots = await getCollection("backups");
+    res.json(snapshots);
+  } catch (err) {
+    req.log.error(err, "GET /backups failed");
+    res.status(500).json({ error: "خطأ في تحميل النسخ الاحتياطية" });
+  }
+});
+
+/** PUT /api/backups — replace all backup snapshots */
+router.put("/backups", async (req, res) => {
+  try {
+    const snapshots = req.body as unknown[];
+    if (!Array.isArray(snapshots)) {
+      res.status(400).json({ error: "البيانات غير صالحة" });
+      return;
+    }
+    await setCollection("backups", snapshots);
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err, "PUT /backups failed");
+    res.status(500).json({ error: "خطأ في حفظ النسخ الاحتياطية" });
   }
 });
 

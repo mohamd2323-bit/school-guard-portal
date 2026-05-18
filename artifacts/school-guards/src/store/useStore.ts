@@ -18,75 +18,16 @@ function genId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-// ─── Backup (localStorage — local user snapshots, not shared) ─────────────────
+// ─── Backup snapshots ─────────────────────────────────────────────────────────
+// Stored in the shared DB so all users/devices share the same backup history.
+// localStorage is used only as a migration path for old local snapshots.
 
-const BACKUP_KEY = "school_guards_backup";
-const BACKUP_LIST_KEY = "school_guards_backups";
 const MAX_SNAPSHOTS = 5;
 
 export interface BackupSnapshot {
   timestamp: string;
   data: AppData;
   users: string | null;
-}
-
-export function getBackupSnapshots(): BackupSnapshot[] {
-  try {
-    const raw = localStorage.getItem(BACKUP_LIST_KEY);
-    if (raw) return JSON.parse(raw) as BackupSnapshot[];
-    // Migrate legacy single-snapshot format
-    const legacy = localStorage.getItem(BACKUP_KEY);
-    if (legacy) {
-      const single = JSON.parse(legacy) as BackupSnapshot;
-      return [single];
-    }
-    return [];
-  } catch {
-    return [];
-  }
-}
-
-export function saveBackupSnapshot(): BackupSnapshot {
-  // Capture current users from session storage for backup
-  const usersRaw = localStorage.getItem("school_guards_session_users");
-  const snapshot: BackupSnapshot = {
-    timestamp: new Date().toISOString(),
-    data: sharedData,
-    users: usersRaw,
-  };
-  const existing = getBackupSnapshots();
-  const updated = [snapshot, ...existing].slice(0, MAX_SNAPSHOTS);
-  localStorage.setItem(BACKUP_LIST_KEY, JSON.stringify(updated));
-  return snapshot;
-}
-
-export function restoreBackupSnapshot(index = 0): boolean {
-  const snapshots = getBackupSnapshots();
-  const snapshot = snapshots[index];
-  if (!snapshot) return false;
-  sharedData = {
-    guards: snapshot.data.guards ?? [],
-    schools: snapshot.data.schools ?? [],
-    needs: snapshot.data.needs ?? [],
-    tickets: snapshot.data.tickets ?? [],
-    operations: snapshot.data.operations ?? [],
-    violations: snapshot.data.violations ?? [],
-  };
-  // Fire-and-forget API save
-  saveDataToApi(sharedData).catch(console.error);
-  // Restore employees to API if backed up
-  if (snapshot.users) {
-    try {
-      const employees = JSON.parse(snapshot.users) as unknown[];
-      fetch("/api/employees", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(employees),
-      }).catch(console.error);
-    } catch {}
-  }
-  listeners.forEach((fn) => fn());
-  return true;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -100,10 +41,30 @@ const EMPTY_DATA: AppData = {
   violations: [],
 };
 
+async function apiGet<T>(path: string, fallback: T): Promise<T> {
+  try {
+    const res = await fetch(path);
+    if (!res.ok) return fallback;
+    return res.json() as Promise<T>;
+  } catch {
+    return fallback;
+  }
+}
+
+async function apiPut(path: string, body: unknown): Promise<void> {
+  try {
+    await fetch(path, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    console.error(`PUT ${path} failed:`, err);
+  }
+}
+
 async function loadDataFromApi(): Promise<AppData> {
-  const res = await fetch("/api/appdata");
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const json = await res.json() as Partial<AppData>;
+  const json = await apiGet<Partial<AppData>>("/api/appdata", {});
   return {
     guards: json.guards ?? [],
     schools: json.schools ?? [],
@@ -115,17 +76,38 @@ async function loadDataFromApi(): Promise<AppData> {
 }
 
 async function saveDataToApi(data: AppData): Promise<void> {
-  await fetch("/api/appdata", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
+  await apiPut("/api/appdata", data);
+}
+
+async function loadBackupsFromApi(): Promise<BackupSnapshot[]> {
+  const arr = await apiGet<BackupSnapshot[]>("/api/backups", []);
+  // Migration: if the DB has no backups yet, check localStorage for legacy data
+  if (arr.length === 0) {
+    try {
+      const legacy =
+        localStorage.getItem("school_guards_backups") ||
+        localStorage.getItem("school_guards_backup");
+      if (legacy) {
+        const parsed = JSON.parse(legacy);
+        const migrated: BackupSnapshot[] = Array.isArray(parsed)
+          ? parsed
+          : [parsed];
+        // Upload migrated data to DB, clear local
+        void apiPut("/api/backups", migrated.slice(0, MAX_SNAPSHOTS));
+        localStorage.removeItem("school_guards_backups");
+        localStorage.removeItem("school_guards_backup");
+        return migrated.slice(0, MAX_SNAPSHOTS);
+      }
+    } catch {}
+  }
+  return arr;
 }
 
 // ─── Module-level shared state ────────────────────────────────────────────────
 
 let listeners: Array<() => void> = [];
 let sharedData: AppData = { ...EMPTY_DATA };
+let sharedBackups: BackupSnapshot[] = [];
 let sharedLoading = true;
 let fetchStarted = false;
 
@@ -137,23 +119,74 @@ async function initData() {
   if (fetchStarted) return;
   fetchStarted = true;
   try {
-    sharedData = await loadDataFromApi();
+    [sharedData, sharedBackups] = await Promise.all([
+      loadDataFromApi(),
+      loadBackupsFromApi(),
+    ]);
   } catch (err) {
     console.error("Failed to load app data:", err);
     sharedData = { ...EMPTY_DATA };
+    sharedBackups = [];
   } finally {
     sharedLoading = false;
     notifyAll();
   }
 }
 
-// Kick off loading immediately when the module is imported — do not wait for
-// a hook consumer to mount, because App.tsx hides the router until loading is
-// done which would create a deadlock if initData() only ran from useStore().
+// Auto-start loading when the module is imported so App.tsx's loading screen
+// doesn't deadlock waiting for a useStore() consumer that never mounts.
 void initData();
 
-// ─── Loading hook (use in App.tsx for global loading state) ──────────────────
+// ─── Backup functions (used directly by DataManagement.tsx) ───────────────────
 
+export function getBackupSnapshots(): BackupSnapshot[] {
+  return sharedBackups;
+}
+
+export function saveBackupSnapshot(): BackupSnapshot {
+  const snapshot: BackupSnapshot = {
+    timestamp: new Date().toISOString(),
+    data: { ...sharedData },
+    users: null, // employees live in the shared DB already
+  };
+  sharedBackups = [snapshot, ...sharedBackups].slice(0, MAX_SNAPSHOTS);
+  void apiPut("/api/backups", sharedBackups);
+  notifyAll();
+  return snapshot;
+}
+
+export function restoreBackupSnapshot(index = 0): boolean {
+  const snapshot = sharedBackups[index];
+  if (!snapshot) return false;
+  sharedData = {
+    guards: snapshot.data.guards ?? [],
+    schools: snapshot.data.schools ?? [],
+    needs: snapshot.data.needs ?? [],
+    tickets: snapshot.data.tickets ?? [],
+    operations: snapshot.data.operations ?? [],
+    violations: snapshot.data.violations ?? [],
+  };
+  void saveDataToApi(sharedData);
+  notifyAll();
+  return true;
+}
+
+// ─── Hooks ────────────────────────────────────────────────────────────────────
+
+/** Subscribe to backup list changes. Use in DataManagement instead of useState. */
+export function useBackups(): BackupSnapshot[] {
+  const [, forceUpdate] = useState(0);
+  useEffect(() => {
+    const listener = () => forceUpdate((n) => n + 1);
+    listeners.push(listener);
+    return () => {
+      listeners = listeners.filter((l) => l !== listener);
+    };
+  }, []);
+  return sharedBackups;
+}
+
+/** Returns true while the initial API fetch is in progress. */
 export function useAppLoading() {
   const [loading, setLoading] = useState(sharedLoading);
   useEffect(() => {
@@ -178,7 +211,6 @@ export function useStore() {
   useEffect(() => {
     const listener = () => forceUpdate((n) => n + 1);
     listeners.push(listener);
-    // Trigger initial fetch on first consumer mount
     initData();
     return () => {
       listeners = listeners.filter((l) => l !== listener);
@@ -187,7 +219,7 @@ export function useStore() {
 
   const setData = useCallback((data: AppData) => {
     sharedData = data;
-    saveDataToApi(data).catch(console.error);
+    void saveDataToApi(data);
     notifyAll();
   }, []);
 
