@@ -97,6 +97,10 @@ export default function GuardProfile({ guard, school, onClose }: Props) {
     .filter((v) => v.guardId === guard.id)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
+  const activeAssignment = guardOps.find(
+    (op) => op.type === "تكليف حارس" && op.assignmentStatus === "نشط"
+  ) ?? null;
+
   const displaySchoolName = guard.schoolName?.trim() || "لا يوجد";
   const displayGovernorate = guard.governorate?.trim() || school?.governorate || "غير محدد";
   const displayRegion = guard.region?.trim() || "عسير";
@@ -143,6 +147,27 @@ export default function GuardProfile({ guard, school, onClose }: Props) {
               <InfoRow label="المحافظة" value={displayGovernorate} />
             </div>
           </section>
+
+          {/* Active assignment */}
+          {activeAssignment && (
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <Briefcase className="w-4 h-4 text-amber-600" />
+                <h3 className="font-bold text-sm text-foreground">التكليف الحالي</h3>
+                <span className="text-xs bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-bold">نشط</span>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 space-y-2">
+                <div className="flex items-start gap-2">
+                  <span className="text-muted-foreground text-sm w-40 flex-shrink-0">الجهة المكلَّف إليها</span>
+                  <span className="text-sm font-semibold text-amber-800">{activeAssignment.details.entity || "—"}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-muted-foreground text-sm w-40 flex-shrink-0">تاريخ بدء التكليف</span>
+                  <span className="text-sm font-medium text-foreground">{formatDate(activeAssignment.details.startDate || activeAssignment.date)}</span>
+                </div>
+              </div>
+            </section>
+          )}
 
           {/* School data */}
           <section>

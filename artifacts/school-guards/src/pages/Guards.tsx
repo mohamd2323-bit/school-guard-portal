@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useStore } from "../store/useStore";
 import GuardProfile from "../components/GuardProfile";
 import type { Guard } from "../types";
-import { Search, FileText, Users, SlidersHorizontal, X } from "lucide-react";
+import { Search, FileText, Users, SlidersHorizontal, X, Briefcase } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -89,7 +89,17 @@ function FilterSelect({
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Guards() {
-  const { guards, schools } = useStore();
+  const { guards, schools, operations } = useStore();
+
+  const assignedGuardIds = useMemo(() => {
+    const ids = new Set<string>();
+    operations.forEach((op) => {
+      if (op.type === "تكليف حارس" && op.assignmentStatus === "نشط" && op.guardId) {
+        ids.add(op.guardId);
+      }
+    });
+    return ids;
+  }, [operations]);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(true);
@@ -322,11 +332,17 @@ export default function Guards() {
                       </button>
                     </td>
                     <td className="font-medium">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         {guard.isDemo && (
                           <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" title="بيانات تجريبية" />
                         )}
                         {guard.name}
+                        {assignedGuardIds.has(guard.id) && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                            <Briefcase className="w-3 h-3" />
+                            مكلف
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="font-mono text-sm">{guard.nationalId}</td>
