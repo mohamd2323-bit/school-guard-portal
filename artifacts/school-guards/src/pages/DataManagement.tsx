@@ -17,6 +17,7 @@ import {
   Ban,
   RotateCcw,
   DatabaseBackup,
+  Download,
 } from "lucide-react";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -363,7 +364,7 @@ type PendingImport = {
 };
 
 export default function DataManagement() {
-  const { importData, clearData, clearDemoData, loadDemoData, hasData, hasDemoData, hasRealData, guards, schools } = useStore();
+  const { importData, clearData, clearDemoData, loadDemoData, hasData, hasDemoData, hasRealData, guards, schools, needs, operations, violations } = useStore();
 
   const [mode, setMode] = useState<"single" | "dual">("single");
   const [pending, setPending] = useState<PendingImport | null>(null);
@@ -397,6 +398,95 @@ export default function DataManagement() {
       setBackupRestoreMsg("noBackup");
       setTimeout(() => setBackupRestoreMsg(null), 4000);
     }
+  }
+
+  const hasExportData =
+    guards.length > 0 ||
+    schools.length > 0 ||
+    operations.length > 0 ||
+    needs.length > 0 ||
+    violations.length > 0;
+
+  function handleExport() {
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const wb = XLSX.utils.book_new();
+
+    // Guards sheet
+    const guardsData = guards.map((g) => ({
+      "الاسم": g.name,
+      "السجل المدني": g.nationalId,
+      "رقم الجوال": g.phone,
+      "الجنس": g.gender,
+      "الحالة": g.status,
+      "نوع الوظيفة": g.jobType ?? "",
+      "المسمى الوظيفي": g.jobTitle ?? "",
+      "المرتبة": g.rank ?? "",
+      "فئة التعيين": g.appointmentCategory ?? "",
+      "المنطقة": g.region ?? "",
+      "المحافظة": g.governorate ?? "",
+      "اسم المدرسة المرتبطة": g.schoolName ?? "",
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(guardsData), "الحراس");
+
+    // Schools sheet
+    const schoolsData = schools.map((s) => ({
+      "اسم المدرسة": s.name,
+      "المحافظة": s.governorate,
+      "المرحلة الدراسية": s.level,
+      "نوع المدرسة": s.type,
+      "اسم المدير/ة": s.principalName,
+      "سجل المدير/ة": s.principalNationalId,
+      "جوال المدير/ة": s.principalPhone,
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(schoolsData), "المدارس");
+
+    // Operations sheet
+    const operationsData = operations.map((op) => ({
+      "نوع العملية": op.type,
+      "الحارس": op.guardName,
+      "التاريخ": op.date,
+      "ملاحظات": op.notes,
+      "منفذ بواسطة": op.performedBy ?? "",
+      "حالة التكليف": op.assignmentStatus ?? "",
+      "تاريخ الإنشاء": op.createdAt,
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(operationsData), "العمليات");
+
+    // Needs sheet
+    const needsData = needs.map((n) => ({
+      "اسم المدرسة": n.schoolName,
+      "المحافظة": n.governorate,
+      "اسم المدير/ة": n.principalName,
+      "سجل المدير/ة": n.principalNationalId,
+      "جوال المدير/ة": n.principalPhone,
+      "نوع الحاجة": n.needType,
+      "السبب": n.reason,
+      "تاريخ الطلب": n.requestDate,
+      "الحالة": n.status,
+      "تاريخ الإنشاء": n.createdAt,
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(needsData), "الاحتياجات");
+
+    // Violations sheet
+    const violationsData = violations.map((v) => ({
+      "رقم القضية": v.caseNumber,
+      "النوع": v.type,
+      "اسم المبلّغ": v.reporterName,
+      "مصدر البلاغ": v.reporterSource,
+      "اسم المدرسة": v.schoolName,
+      "المحافظة": v.governorate,
+      "اسم الحارس": v.guardName,
+      "الوصف": v.description,
+      "تاريخ الإبلاغ": v.reportDate,
+      "الحالة": v.status,
+      "الإجراء المتخذ": v.actionTaken,
+      "ملاحظات": v.notes,
+      "تاريخ الإنشاء": v.createdAt,
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(violationsData), "المخالفات");
+
+    XLSX.writeFile(wb, `school-guards-export-${today}.xlsx`);
   }
 
   function formatBackupDate(iso: string) {
@@ -600,6 +690,14 @@ export default function DataManagement() {
           >
             <Save className="w-4 h-4" />
             حفظ البيانات
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={!hasExportData}
+            className="flex items-center gap-2 bg-white border border-teal-300 text-teal-700 hover:bg-teal-50 disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            تصدير كامل
           </button>
           <button
             onClick={handleRestoreBackup}
