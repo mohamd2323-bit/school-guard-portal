@@ -3,7 +3,8 @@ import { useSearch } from "wouter";
 import { useStore } from "../store/useStore";
 import GuardProfile from "../components/GuardProfile";
 import type { Guard } from "../types";
-import { Search, FileText, Users, SlidersHorizontal, X, Briefcase } from "lucide-react";
+import { Search, FileText, Users, SlidersHorizontal, X, Briefcase, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -218,6 +219,26 @@ export default function Guards() {
     ? schools.find((s) => s.id === selectedGuard.schoolId) || null
     : null;
 
+  function exportToExcel() {
+    const rows = filtered.map((g) => ({
+      "اسم الحارس": g.name,
+      "السجل المدني": g.nationalId,
+      "رقم الجوال": g.phone,
+      "المدرسة الحالية": g.schoolName ?? "",
+      "نوع الوظيفة": g.jobType ?? "",
+      "المرتبة": g.rank ?? "",
+      "الحالة": g.status,
+      "التكليف": assignedGuardIds.has(g.id) ? "مكلف" : "غير مكلف",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows, {
+      header: ["اسم الحارس", "السجل المدني", "رقم الجوال", "المدرسة الحالية", "نوع الوظيفة", "المرتبة", "الحالة", "التكليف"],
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "الحراس");
+    XLSX.writeFile(wb, "قائمة_الحراس.xlsx");
+  }
+
   return (
     <div className="space-y-4">
       {/* ── Header row ─────────────────────────────────────────────────────── */}
@@ -261,6 +282,17 @@ export default function Guards() {
                   {activeCount}
                 </span>
               )}
+            </button>
+          )}
+          {/* Export button */}
+          {guards.length > 0 && (
+            <button
+              onClick={exportToExcel}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-white text-sm font-semibold text-foreground hover:border-primary/40 hover:text-primary transition-colors"
+              title={`تصدير ${filtered.length.toLocaleString("ar-SA")} حارس إلى Excel`}
+            >
+              <Download className="w-4 h-4" />
+              تصدير
             </button>
           )}
         </div>
