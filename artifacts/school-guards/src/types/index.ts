@@ -83,6 +83,7 @@ export type OperationType =
   | "إنهاء نقل"
   | "إنهاء تكليف"
   | "حذف مدرسة"
+  | "حذف حارس"
   | "أخرى";
 
 export interface Operation {

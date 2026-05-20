@@ -1,12 +1,21 @@
 import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useStore } from "../store/useStore";
+import { useUsers } from "../store/useUsers";
 import GuardProfile from "../components/GuardProfile";
-import type { Guard } from "../types";
-import { Search, FileText, Users, SlidersHorizontal, X, Briefcase, Download } from "lucide-react";
+import type { Guard, School, Operation } from "../types";
+import type { Employee } from "../store/useUsers";
+import {
+  Search, FileText, Users, SlidersHorizontal, X, Briefcase,
+  Download, Pencil, Trash2, Eye, EyeOff, Save, AlertTriangle,
+} from "lucide-react";
 import * as XLSX from "xlsx";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function genId() {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
 
 function unique(values: (string | undefined | null)[]): string[] {
   return Array.from(new Set(values.filter(Boolean) as string[])).sort((a, b) =>
@@ -136,10 +145,338 @@ function initGuardsState(): GuardsPersistedState {
   return { search: "", filters: EMPTY_FILTERS };
 }
 
+// ─── Edit Guard Modal ──────────────────────────────────────────────────────────
+
+function EditGuardModal({
+  guard,
+  schools,
+  onSave,
+  onClose,
+}: {
+  guard: Guard;
+  schools: School[];
+  onSave: (patch: Partial<Guard>) => void;
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: guard.name,
+    nationalId: guard.nationalId,
+    phone: guard.phone,
+    gender: guard.gender as string,
+    jobTitle: guard.jobTitle ?? "",
+    rank: guard.rank ?? "",
+    jobType: guard.jobType ?? "",
+    schoolId: guard.schoolId ?? "",
+    status: guard.status as string,
+  });
+
+  function set(key: string, value: string) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const selectedSchool = form.schoolId
+      ? schools.find((s) => s.id === form.schoolId)
+      : null;
+    const patch: Partial<Guard> = {
+      name: form.name.trim(),
+      nationalId: form.nationalId.trim(),
+      phone: form.phone.trim(),
+      gender: form.gender as "ذكر" | "أنثى",
+      jobTitle: form.jobTitle.trim() || undefined,
+      rank: form.rank.trim() || undefined,
+      jobType: form.jobType.trim() || undefined,
+      schoolId: selectedSchool?.id ?? null,
+      schoolName: selectedSchool?.name ?? null,
+      status: form.status as "نشط" | "غير نشط",
+    };
+    onSave(patch);
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      dir="rtl"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
+          <h2 className="font-bold text-foreground flex items-center gap-2">
+            <Pencil className="w-4 h-4 text-primary" />
+            تعديل بيانات الحارس
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Form body */}
+        <form
+          id="edit-guard-form"
+          onSubmit={handleSubmit}
+          className="overflow-y-auto flex-1 px-6 py-5 space-y-4"
+        >
+          <div className="grid grid-cols-2 gap-4">
+            {/* اسم الحارس */}
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                اسم الحارس <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={form.name}
+                onChange={(e) => set("name", e.target.value)}
+                required
+                className="w-full px-3 py-2 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+
+            {/* السجل المدني */}
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                السجل المدني <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={form.nationalId}
+                onChange={(e) => set("nationalId", e.target.value)}
+                required
+                dir="ltr"
+                className="w-full px-3 py-2 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono"
+              />
+            </div>
+
+            {/* رقم الجوال */}
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground mb-1">رقم الجوال</label>
+              <input
+                type="text"
+                value={form.phone}
+                onChange={(e) => set("phone", e.target.value)}
+                dir="ltr"
+                className="w-full px-3 py-2 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono"
+              />
+            </div>
+
+            {/* الجنس */}
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground mb-1">الجنس</label>
+              <select
+                value={form.gender}
+                onChange={(e) => set("gender", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="ذكر">ذكر</option>
+                <option value="أنثى">أنثى</option>
+              </select>
+            </div>
+
+            {/* الحالة */}
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground mb-1">الحالة</label>
+              <select
+                value={form.status}
+                onChange={(e) => set("status", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="نشط">نشط</option>
+                <option value="غير نشط">غير نشط</option>
+              </select>
+            </div>
+
+            {/* المسمى الوظيفي */}
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground mb-1">المسمى الوظيفي</label>
+              <input
+                type="text"
+                value={form.jobTitle}
+                onChange={(e) => set("jobTitle", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+
+            {/* المرتبة */}
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground mb-1">المرتبة</label>
+              <input
+                type="text"
+                value={form.rank}
+                onChange={(e) => set("rank", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+
+            {/* نوع الوظيفة */}
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold text-muted-foreground mb-1">نوع الوظيفة</label>
+              <input
+                type="text"
+                value={form.jobType}
+                onChange={(e) => set("jobType", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+
+            {/* المدرسة الحالية */}
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold text-muted-foreground mb-1">المدرسة الحالية</label>
+              <select
+                value={form.schoolId}
+                onChange={(e) => set("schoolId", e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="">— غير محدد —</option>
+                {schools.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </form>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-border flex-shrink-0 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg border border-border text-sm font-medium hover:bg-muted text-foreground transition-colors"
+          >
+            إلغاء
+          </button>
+          <button
+            type="submit"
+            form="edit-guard-form"
+            className="px-4 py-2 rounded-xl text-white text-sm font-bold flex items-center gap-2 transition-colors bg-primary hover:bg-primary/90"
+          >
+            <Save className="w-4 h-4" />
+            حفظ التعديلات
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Delete Guard Dialog ───────────────────────────────────────────────────────
+
+function DeleteGuardDialog({
+  guard,
+  currentUser,
+  onConfirm,
+  onClose,
+}: {
+  guard: Guard;
+  currentUser: Employee;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (password !== currentUser.password) {
+      setError("كلمة المرور غير صحيحة");
+      return;
+    }
+    onConfirm();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 text-center">
+          <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3">
+            <Trash2 className="w-6 h-6 text-red-600" />
+          </div>
+          <h2 className="font-bold text-foreground text-lg">تأكيد حذف الحارس</h2>
+          <p className="text-muted-foreground text-sm mt-1">هذا الإجراء لا يمكن التراجع عنه</p>
+        </div>
+
+        {/* Guard info */}
+        <div className="mx-6 mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm space-y-1.5">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">اسم الحارس</span>
+            <span className="font-semibold text-foreground">{guard.name}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">السجل المدني</span>
+            <span className="font-mono font-semibold text-foreground" dir="ltr">{guard.nationalId}</span>
+          </div>
+        </div>
+
+        {/* Password form */}
+        <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-muted-foreground mb-1">
+              كلمة المرور <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                placeholder="أدخل كلمة مرورك للتأكيد"
+                dir="ltr"
+                autoFocus
+                required
+                className="w-full px-4 py-2.5 pl-10 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-red-300 font-mono"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+              {error}
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
+            >
+              إلغاء
+            </button>
+            <button
+              type="submit"
+              disabled={!password}
+              className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-40"
+            >
+              <Trash2 className="w-4 h-4" />
+              حذف
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Guards() {
-  const { guards, schools, operations } = useStore();
+  const { guards, schools, operations, updateGuard, deleteGuard } = useStore();
+  const { isAdmin, currentUser } = useUsers();
   const [, navigate] = useLocation();
 
   const assignedGuardIds = useMemo(() => {
@@ -181,6 +518,8 @@ export default function Guards() {
   }, [filters, search, navigate]);
 
   const [selectedGuard, setSelectedGuard] = useState<Guard | null>(null);
+  const [editTarget, setEditTarget] = useState<Guard | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Guard | null>(null);
 
   // Derive unique option lists from real data
   const options = useMemo(() => ({
@@ -202,7 +541,6 @@ export default function Guards() {
 
   const filtered = useMemo(() => {
     return guards.filter((g) => {
-      // Search box
       const q = search.trim();
       const matchSearch =
         !q ||
@@ -213,7 +551,6 @@ export default function Guards() {
         (g.jobType || "").includes(q) ||
         (g.rank || "").includes(q);
 
-      // Dropdown filters
       const matchGovernorate = !filters.governorate || g.governorate === filters.governorate;
       const matchSchool = !filters.schoolName || g.schoolName === filters.schoolName;
       const matchGender = !filters.gender || g.gender === filters.gender;
@@ -292,6 +629,50 @@ export default function Guards() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "الحراس");
     XLSX.writeFile(wb, "قائمة_الحراس.xlsx");
+  }
+
+  // ── Edit / Delete handlers ──────────────────────────────────────────────────
+
+  function handleEditSave(patch: Partial<Guard>) {
+    if (!editTarget || !currentUser) return;
+    const now = new Date().toISOString();
+    const op: Operation = {
+      id: genId(),
+      type: "تعديل بيانات",
+      guardId: editTarget.id,
+      guardName: patch.name ?? editTarget.name,
+      date: now.split("T")[0],
+      notes: "",
+      createdAt: now,
+      details: {
+        nationalId: editTarget.nationalId,
+        performedBy: currentUser.username,
+      },
+      performedBy: currentUser.username,
+    };
+    updateGuard(editTarget.id, patch, op);
+    setEditTarget(null);
+  }
+
+  function handleDeleteConfirm() {
+    if (!deleteTarget || !currentUser) return;
+    const now = new Date().toISOString();
+    const op: Operation = {
+      id: genId(),
+      type: "حذف حارس",
+      guardId: deleteTarget.id,
+      guardName: deleteTarget.name,
+      date: now.split("T")[0],
+      notes: "",
+      createdAt: now,
+      details: {
+        nationalId: deleteTarget.nationalId,
+        deletedBy: currentUser.username,
+      },
+      performedBy: currentUser.username,
+    };
+    deleteGuard(deleteTarget.id, op);
+    setDeleteTarget(null);
   }
 
   return (
@@ -428,7 +809,7 @@ export default function Guards() {
         </div>
       )}
 
-      {/* ── Table (unchanged) ──────────────────────────────────────────────── */}
+      {/* ── Table ──────────────────────────────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
         {guards.length === 0 ? (
           <div className="py-20 text-center">
@@ -458,7 +839,7 @@ export default function Guards() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th className="w-20">ملف</th>
+                  <th className="w-36">إجراءات</th>
                   <th>اسم الحارس</th>
                   <th>السجل المدني</th>
                   <th>رقم الجوال</th>
@@ -472,14 +853,37 @@ export default function Guards() {
                 {filtered.map((guard) => (
                   <tr key={guard.id}>
                     <td>
-                      <button
-                        onClick={() => setSelectedGuard(guard)}
-                        className="flex items-center gap-1.5 text-primary hover:text-primary/80 font-medium text-xs bg-primary/5 hover:bg-primary/10 px-2.5 py-1.5 rounded-lg transition-colors"
-                        title="عرض الملف"
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                        <span>ملف</span>
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        {/* ملف */}
+                        <button
+                          onClick={() => setSelectedGuard(guard)}
+                          className="flex items-center gap-1 text-primary hover:text-primary/80 font-medium text-xs bg-primary/5 hover:bg-primary/10 px-2 py-1.5 rounded-lg transition-colors"
+                          title="عرض الملف"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>ملف</span>
+                        </button>
+                        {/* تعديل */}
+                        <button
+                          onClick={() => setEditTarget(guard)}
+                          className="flex items-center gap-1 text-amber-700 hover:text-amber-800 font-medium text-xs bg-amber-50 hover:bg-amber-100 px-2 py-1.5 rounded-lg transition-colors"
+                          title="تعديل بيانات الحارس"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>تعديل</span>
+                        </button>
+                        {/* حذف — admin only */}
+                        {isAdmin && (
+                          <button
+                            onClick={() => setDeleteTarget(guard)}
+                            className="flex items-center gap-1 text-red-600 hover:text-red-700 font-medium text-xs bg-red-50 hover:bg-red-100 px-2 py-1.5 rounded-lg transition-colors"
+                            title="حذف الحارس"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>حذف</span>
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className="font-medium">
                       <div className="flex items-center gap-1.5 flex-wrap">
@@ -527,11 +931,32 @@ export default function Guards() {
         )}
       </div>
 
+      {/* ── Guard Profile Modal ─────────────────────────────────────────────── */}
       {selectedGuard && (
         <GuardProfile
           guard={selectedGuard}
           school={selectedSchool}
           onClose={() => setSelectedGuard(null)}
+        />
+      )}
+
+      {/* ── Edit Guard Modal ────────────────────────────────────────────────── */}
+      {editTarget && (
+        <EditGuardModal
+          guard={editTarget}
+          schools={schools}
+          onSave={handleEditSave}
+          onClose={() => setEditTarget(null)}
+        />
+      )}
+
+      {/* ── Delete Guard Dialog ─────────────────────────────────────────────── */}
+      {deleteTarget && currentUser && (
+        <DeleteGuardDialog
+          guard={deleteTarget}
+          currentUser={currentUser}
+          onConfirm={handleDeleteConfirm}
+          onClose={() => setDeleteTarget(null)}
         />
       )}
     </div>

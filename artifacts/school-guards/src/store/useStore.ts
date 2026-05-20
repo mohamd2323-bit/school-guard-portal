@@ -405,6 +405,16 @@ export function useStore() {
     [setData]
   );
 
+  const deleteGuard = useCallback(
+    (id: string, op: Operation) =>
+      setData({
+        ...sharedData,
+        guards: sharedData.guards.filter((g) => g.id !== id),
+        operations: [op, ...sharedData.operations],
+      }),
+    [setData]
+  );
+
   const updateGuard = useCallback(
     (id: string, patch: Partial<Guard>, op: Operation) =>
       setData({
@@ -511,6 +521,7 @@ export function useStore() {
     assignGuard,
     cancelAssignment,
     addGuard,
+    deleteGuard,
     updateGuard,
     addSchool,
     updateSchool,

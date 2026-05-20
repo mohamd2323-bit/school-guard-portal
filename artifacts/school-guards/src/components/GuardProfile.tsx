@@ -37,6 +37,7 @@ const OP_ICONS: Record<OperationType, React.ReactNode> = {
   "إنهاء نقل": <ArrowLeftRight className="w-3.5 h-3.5" />,
   "إنهاء تكليف": <X className="w-3.5 h-3.5" />,
   "حذف مدرسة": <Trash2 className="w-3.5 h-3.5" />,
+  "حذف حارس": <Trash2 className="w-3.5 h-3.5" />,
   "أخرى": <Settings2 className="w-3.5 h-3.5" />,
 };
 
@@ -50,6 +51,7 @@ const OP_COLORS: Record<OperationType, string> = {
   "إنهاء نقل": "bg-orange-50 text-orange-700",
   "إنهاء تكليف": "bg-red-50 text-red-700",
   "حذف مدرسة": "bg-red-50 text-red-700",
+  "حذف حارس": "bg-red-50 text-red-700",
   "أخرى": "bg-gray-50 text-gray-600",
 };
 
