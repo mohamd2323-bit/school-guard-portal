@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { useSearch } from "wouter";
+import { useLocation } from "wouter";
 import { useStore } from "../store/useStore";
 import { useUsers } from "../store/useUsers";
 import {
@@ -31,9 +31,36 @@ function makeOp(
   return { id: genId(), type, guardId, guardName, date, notes, createdAt: new Date().toISOString(), details };
 }
 
-// ─── Filter type ─────────────────────────────────────────────────────────────
+// ─── Filter type & persistence ────────────────────────────────────────────────
 
 type GuardFilter = "all" | "no-guard" | "has-guard";
+
+const SCHOOLS_STORAGE_KEY = "schoolsFilters";
+
+interface SchoolsPersistedState {
+  search: string;
+  guardFilter: GuardFilter;
+}
+
+function initSchoolsState(): SchoolsPersistedState {
+  const p = new URLSearchParams(window.location.search);
+  const hasUrlFilters = p.get("guard") || p.get("q");
+  if (hasUrlFilters) {
+    const v = p.get("guard");
+    return {
+      search: p.get("q") ?? "",
+      guardFilter: v === "no-guard" || v === "has-guard" ? v : "all",
+    };
+  }
+  try {
+    const raw = sessionStorage.getItem(SCHOOLS_STORAGE_KEY);
+    if (raw) {
+      const stored = JSON.parse(raw) as SchoolsPersistedState;
+      if (stored && typeof stored.guardFilter === "string") return stored;
+    }
+  } catch {}
+  return { search: "", guardFilter: "all" };
+}
 
 // ─── Guard picker (inline) ────────────────────────────────────────────────────
 
@@ -500,17 +527,22 @@ type ActionModal = { type: "assign" | "temp" | "need"; school: School };
 export default function Schools() {
   const { schools, guards, addSchool, updateSchool, deleteSchool } = useStore();
   const { currentUser, isAdmin } = useUsers();
-  const searchString = useSearch();
-  const [search, setSearch] = useState("");
-  const [guardFilter, setGuardFilter] = useState<GuardFilter>("all");
+  const [, navigate] = useLocation();
+
+  const initialState = useMemo(initSchoolsState, []);
+  const [search, setSearch] = useState(initialState.search);
+  const [guardFilter, setGuardFilter] = useState<GuardFilter>(initialState.guardFilter);
 
   useEffect(() => {
-    const params = new URLSearchParams(searchString);
-    const guard = params.get("guard");
-    if (guard === "no-guard") {
-      setGuardFilter("no-guard");
-    }
-  }, [searchString]);
+    const state: SchoolsPersistedState = { search, guardFilter };
+    try { sessionStorage.setItem(SCHOOLS_STORAGE_KEY, JSON.stringify(state)); } catch {}
+    const p = new URLSearchParams();
+    if (search) p.set("q", search);
+    if (guardFilter !== "all") p.set("guard", guardFilter);
+    const qs = p.toString();
+    navigate("/schools" + (qs ? "?" + qs : ""), { replace: true });
+  }, [guardFilter, search, navigate]);
+
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [actionModal, setActionModal] = useState<ActionModal | null>(null);
   const [formModal, setFormModal] = useState<{ mode: "add" } | { mode: "edit"; school: School } | null>(null);

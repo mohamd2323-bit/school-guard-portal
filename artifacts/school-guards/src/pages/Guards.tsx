@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useSearch } from "wouter";
+import { useLocation } from "wouter";
 import { useStore } from "../store/useStore";
 import GuardProfile from "../components/GuardProfile";
 import type { Guard } from "../types";
@@ -94,11 +94,53 @@ function FilterSelect({
   );
 }
 
+// ─── Filter persistence helpers ───────────────────────────────────────────────
+
+const GUARDS_STORAGE_KEY = "guardsFilters";
+
+interface GuardsPersistedState {
+  search: string;
+  filters: FilterState;
+}
+
+const FILTER_URL_KEYS = ["q", "governorate", "schoolName", "gender", "jobTitle", "rank", "jobType", "status", "assignment"];
+
+function initGuardsState(): GuardsPersistedState {
+  const p = new URLSearchParams(window.location.search);
+  const hasUrlFilters = FILTER_URL_KEYS.some((k) => p.get(k));
+  if (hasUrlFilters) {
+    const assignment = p.get("assignment") ?? "";
+    const gender = p.get("gender") ?? "";
+    const status = p.get("status") ?? "";
+    return {
+      search: p.get("q") ?? "",
+      filters: {
+        governorate: p.get("governorate") ?? "",
+        schoolName: p.get("schoolName") ?? "",
+        gender: gender === "ذكر" || gender === "أنثى" ? gender : "",
+        jobTitle: p.get("jobTitle") ?? "",
+        rank: p.get("rank") ?? "",
+        jobType: p.get("jobType") ?? "",
+        status: status === "نشط" || status === "غير نشط" ? status : "",
+        assignment: assignment === "مكلف" || assignment === "غير مكلف" ? assignment : "",
+      },
+    };
+  }
+  try {
+    const raw = sessionStorage.getItem(GUARDS_STORAGE_KEY);
+    if (raw) {
+      const stored = JSON.parse(raw) as GuardsPersistedState;
+      if (stored && typeof stored.filters === "object") return stored;
+    }
+  } catch {}
+  return { search: "", filters: EMPTY_FILTERS };
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Guards() {
   const { guards, schools, operations } = useStore();
-  const searchString = useSearch();
+  const [, navigate] = useLocation();
 
   const assignedGuardIds = useMemo(() => {
     const ids = new Set<string>();
@@ -113,24 +155,31 @@ export default function Guards() {
     });
     return ids;
   }, [operations]);
-  const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
-  const [filtersOpen, setFiltersOpen] = useState(true);
+
+  const initialState = useMemo(initGuardsState, []);
+  const [search, setSearch] = useState(initialState.search);
+  const [filters, setFilters] = useState<FilterState>(initialState.filters);
+  const [filtersOpen, setFiltersOpen] = useState(
+    () => Object.values(initialState.filters).some((v) => v !== "") || initialState.search !== ""
+  );
 
   useEffect(() => {
-    const params = new URLSearchParams(searchString);
-    const assignment = params.get("assignment");
-    const gender = params.get("gender");
-    const status = params.get("status");
-    const updates: Partial<FilterState> = {};
-    if (assignment === "مكلف" || assignment === "غير مكلف") updates.assignment = assignment;
-    if (gender === "ذكر" || gender === "أنثى") updates.gender = gender;
-    if (status === "نشط" || status === "غير نشط") updates.status = status;
-    if (Object.keys(updates).length > 0) {
-      setFilters((prev) => ({ ...EMPTY_FILTERS, ...updates }));
-      setFiltersOpen(true);
-    }
-  }, [searchString]);
+    const state: GuardsPersistedState = { search, filters };
+    try { sessionStorage.setItem(GUARDS_STORAGE_KEY, JSON.stringify(state)); } catch {}
+    const p = new URLSearchParams();
+    if (search) p.set("q", search);
+    if (filters.governorate) p.set("governorate", filters.governorate);
+    if (filters.schoolName) p.set("schoolName", filters.schoolName);
+    if (filters.gender) p.set("gender", filters.gender);
+    if (filters.jobTitle) p.set("jobTitle", filters.jobTitle);
+    if (filters.rank) p.set("rank", filters.rank);
+    if (filters.jobType) p.set("jobType", filters.jobType);
+    if (filters.status) p.set("status", filters.status);
+    if (filters.assignment) p.set("assignment", filters.assignment);
+    const qs = p.toString();
+    navigate("/guards" + (qs ? "?" + qs : ""), { replace: true });
+  }, [filters, search, navigate]);
+
   const [selectedGuard, setSelectedGuard] = useState<Guard | null>(null);
 
   // Derive unique option lists from real data
