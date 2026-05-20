@@ -1,4 +1,5 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { useEffect } from "react";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Guards from "./pages/Guards";
@@ -9,7 +10,9 @@ import Tickets from "./pages/Tickets";
 import Operations from "./pages/Operations";
 import Violations from "./pages/Violations";
 import Users from "./pages/Users";
+import LoginPage from "./pages/LoginPage";
 import { useAppLoading } from "./store/useStore";
+import { useUsers } from "./store/useUsers";
 
 function NotFound() {
   return (
@@ -30,6 +33,17 @@ function LoadingScreen() {
   );
 }
 
+// Redirects non-admins away from admin-only routes.
+function AdminOnly({ children }: { children: React.ReactNode }) {
+  const { isAdmin } = useUsers();
+  const [, navigate] = useLocation();
+  useEffect(() => {
+    if (!isAdmin) navigate("/");
+  }, [isAdmin, navigate]);
+  if (!isAdmin) return null;
+  return <>{children}</>;
+}
+
 function Router() {
   return (
     <Layout>
@@ -42,7 +56,13 @@ function Router() {
         <Route path="/violations" component={Violations} />
         <Route path="/tickets" component={Tickets} />
         <Route path="/data" component={DataManagement} />
-        <Route path="/users" component={Users} />
+        <Route path="/users">
+          {() => (
+            <AdminOnly>
+              <Users />
+            </AdminOnly>
+          )}
+        </Route>
         <Route component={NotFound} />
       </Switch>
     </Layout>
@@ -51,10 +71,17 @@ function Router() {
 
 function App() {
   const loading = useAppLoading();
+  const { currentUser } = useUsers();
 
   return (
     <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-      {loading ? <LoadingScreen /> : <Router />}
+      {loading ? (
+        <LoadingScreen />
+      ) : !currentUser ? (
+        <LoginPage />
+      ) : (
+        <Router />
+      )}
     </WouterRouter>
   );
 }

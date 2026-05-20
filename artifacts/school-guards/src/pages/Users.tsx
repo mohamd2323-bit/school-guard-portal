@@ -456,12 +456,10 @@ export default function Users() {
     inactive: employees.filter((e) => e.status === "غير نشط").length,
   }), [employees]);
 
-  // ── Not logged in ─────────────────────────────────────────────────────────
-  if (!currentUser) {
-    return <LoginScreen onLogin={async (u, p) => !!(await login(u, p))} />;
-  }
+  // App.tsx guarantees we only render when logged in; this guard satisfies TS.
+  if (!currentUser) return null;
 
-  // ── Logged in but not admin ───────────────────────────────────────────────
+  // ── Logged in but not admin (safety-net — AdminOnly in App.tsx handles redirect) ──
   if (!isAdmin) {
     return <AccessDenied currentUser={currentUser} onLogout={logout} />;
   }
