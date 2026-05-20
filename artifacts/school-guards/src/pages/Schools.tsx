@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
+import { useSearch } from "wouter";
 import { useStore } from "../store/useStore";
 import { useUsers } from "../store/useUsers";
 import {
@@ -499,8 +500,17 @@ type ActionModal = { type: "assign" | "temp" | "need"; school: School };
 export default function Schools() {
   const { schools, guards, addSchool, updateSchool, deleteSchool } = useStore();
   const { currentUser, isAdmin } = useUsers();
+  const searchString = useSearch();
   const [search, setSearch] = useState("");
   const [guardFilter, setGuardFilter] = useState<GuardFilter>("all");
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const guard = params.get("guard");
+    if (guard === "no-guard") {
+      setGuardFilter("no-guard");
+    }
+  }, [searchString]);
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [actionModal, setActionModal] = useState<ActionModal | null>(null);
   const [formModal, setFormModal] = useState<{ mode: "add" } | { mode: "edit"; school: School } | null>(null);

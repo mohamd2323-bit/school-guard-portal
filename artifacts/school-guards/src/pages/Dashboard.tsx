@@ -320,12 +320,36 @@ export default function Dashboard() {
     label: string; value: number; icon: React.ElementType;
     bg: string; iconColor: string; border: string; onClick?: () => void;
   }[] = [
-    { label: "إجمالي الحراس", value: stats.total, icon: Users, bg: "bg-teal-50", iconColor: "text-teal-600", border: "border-teal-200" },
-    { label: "إجمالي المدارس", value: stats.schools, icon: School, bg: "bg-blue-50", iconColor: "text-blue-600", border: "border-blue-200" },
-    { label: "الحراس الذكور", value: stats.male, icon: UserCheck, bg: "bg-indigo-50", iconColor: "text-indigo-600", border: "border-indigo-200" },
-    { label: "الحارسات الإناث", value: stats.female, icon: UserX, bg: "bg-pink-50", iconColor: "text-pink-600", border: "border-pink-200" },
-    { label: "مدارس بدون حارس", value: stats.schoolsNoGuard, icon: AlertTriangle, bg: "bg-orange-50", iconColor: "text-orange-600", border: "border-orange-200" },
-    { label: "الحراس على رأس العمل", value: stats.active, icon: ShieldCheck, bg: "bg-emerald-50", iconColor: "text-emerald-600", border: "border-emerald-200" },
+    {
+      label: "إجمالي الحراس", value: stats.total, icon: Users,
+      bg: "bg-teal-50", iconColor: "text-teal-600", border: "border-teal-200",
+      onClick: () => navigate("/guards"),
+    },
+    {
+      label: "إجمالي المدارس", value: stats.schools, icon: School,
+      bg: "bg-blue-50", iconColor: "text-blue-600", border: "border-blue-200",
+      onClick: () => navigate("/schools"),
+    },
+    {
+      label: "الحراس الذكور", value: stats.male, icon: UserCheck,
+      bg: "bg-indigo-50", iconColor: "text-indigo-600", border: "border-indigo-200",
+      onClick: () => navigate("/guards?gender=ذكر"),
+    },
+    {
+      label: "الحارسات الإناث", value: stats.female, icon: UserX,
+      bg: "bg-pink-50", iconColor: "text-pink-600", border: "border-pink-200",
+      onClick: () => navigate("/guards?gender=أنثى"),
+    },
+    {
+      label: "مدارس بدون حارس", value: stats.schoolsNoGuard, icon: AlertTriangle,
+      bg: "bg-orange-50", iconColor: "text-orange-600", border: "border-orange-200",
+      onClick: () => navigate("/schools?guard=no-guard"),
+    },
+    {
+      label: "الحراس على رأس العمل", value: stats.active, icon: ShieldCheck,
+      bg: "bg-emerald-50", iconColor: "text-emerald-600", border: "border-emerald-200",
+      onClick: () => navigate("/guards?status=نشط"),
+    },
     {
       label: "الحراس المكلفون", value: stats.delegated, icon: Briefcase,
       bg: "bg-amber-50", iconColor: "text-amber-600", border: "border-amber-200",

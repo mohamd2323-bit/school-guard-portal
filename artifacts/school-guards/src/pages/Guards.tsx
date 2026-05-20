@@ -120,8 +120,14 @@ export default function Guards() {
   useEffect(() => {
     const params = new URLSearchParams(searchString);
     const assignment = params.get("assignment");
-    if (assignment === "مكلف" || assignment === "غير مكلف") {
-      setFilters((prev) => ({ ...prev, assignment }));
+    const gender = params.get("gender");
+    const status = params.get("status");
+    const updates: Partial<FilterState> = {};
+    if (assignment === "مكلف" || assignment === "غير مكلف") updates.assignment = assignment;
+    if (gender === "ذكر" || gender === "أنثى") updates.gender = gender;
+    if (status === "نشط" || status === "غير نشط") updates.status = status;
+    if (Object.keys(updates).length > 0) {
+      setFilters((prev) => ({ ...EMPTY_FILTERS, ...updates }));
       setFiltersOpen(true);
     }
   }, [searchString]);
