@@ -394,6 +394,11 @@ export default function DataManagement() {
     setExportSheets((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
+  function toggleAllExportSheets() {
+    const allChecked = Object.values(exportSheets).every(Boolean);
+    setExportSheets({ guards: !allChecked, schools: !allChecked, operations: !allChecked, needs: !allChecked, violations: !allChecked });
+  }
+
   function handleSaveBackup(label: string) {
     try {
       saveBackupSnapshot(label);
@@ -803,7 +808,15 @@ export default function DataManagement() {
         {/* Export sheet selector panel */}
         {showExportPanel && (
           <div className="bg-teal-50/60 border border-teal-200 rounded-xl p-4 space-y-3">
-            <p className="text-sm font-semibold text-teal-900">اختر الأوراق المراد تصديرها:</p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-teal-900">اختر الأوراق المراد تصديرها:</p>
+              <button
+                onClick={toggleAllExportSheets}
+                className="text-xs font-medium text-teal-700 hover:text-teal-900 underline underline-offset-2 transition-colors"
+              >
+                {Object.values(exportSheets).every(Boolean) ? "إلغاء الكل" : "تحديد الكل"}
+              </button>
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {(
                 [
