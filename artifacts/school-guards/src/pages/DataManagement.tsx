@@ -382,21 +382,51 @@ export default function DataManagement() {
   const [backupLabel, setBackupLabel] = useState("");
 
   const [showExportPanel, setShowExportPanel] = useState(false);
-  const [exportSheets, setExportSheets] = useState({
-    guards: true,
-    schools: true,
-    operations: true,
-    needs: true,
-    violations: true,
-  });
+
+  const EXPORT_SHEETS_KEY = "exportSheetsSelection";
+
+  function loadExportSheets() {
+    try {
+      const saved = localStorage.getItem(EXPORT_SHEETS_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as Record<string, boolean>;
+        return {
+          guards: parsed.guards ?? true,
+          schools: parsed.schools ?? true,
+          operations: parsed.operations ?? true,
+          needs: parsed.needs ?? true,
+          violations: parsed.violations ?? true,
+        };
+      }
+    } catch {
+      /* ignore */
+    }
+    return { guards: true, schools: true, operations: true, needs: true, violations: true };
+  }
+
+  const [exportSheets, setExportSheets] = useState(loadExportSheets);
+
+  function saveExportSheets(sheets: typeof exportSheets) {
+    try {
+      localStorage.setItem(EXPORT_SHEETS_KEY, JSON.stringify(sheets));
+    } catch {
+      /* ignore */
+    }
+  }
 
   function toggleExportSheet(key: keyof typeof exportSheets) {
-    setExportSheets((prev) => ({ ...prev, [key]: !prev[key] }));
+    setExportSheets((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      saveExportSheets(next);
+      return next;
+    });
   }
 
   function toggleAllExportSheets() {
     const allChecked = Object.values(exportSheets).every(Boolean);
-    setExportSheets({ guards: !allChecked, schools: !allChecked, operations: !allChecked, needs: !allChecked, violations: !allChecked });
+    const next = { guards: !allChecked, schools: !allChecked, operations: !allChecked, needs: !allChecked, violations: !allChecked };
+    saveExportSheets(next);
+    setExportSheets(next);
   }
 
   function handleSaveBackup(label: string) {
