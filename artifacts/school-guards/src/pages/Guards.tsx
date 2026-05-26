@@ -380,14 +380,29 @@ function DeleteGuardDialog({
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [verifying, setVerifying] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (password !== currentUser.password) {
-      setError("كلمة المرور غير صحيحة");
-      return;
+    setVerifying(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: currentUser.username, password }),
+      });
+      const data = await res.json() as { ok: boolean };
+      if (!data.ok) {
+        setError("كلمة المرور غير صحيحة");
+        return;
+      }
+      onConfirm();
+    } catch {
+      setError("تعذر التحقق من كلمة المرور، حاول مجدداً");
+    } finally {
+      setVerifying(false);
     }
-    onConfirm();
   }
 
   return (
@@ -459,11 +474,13 @@ function DeleteGuardDialog({
             </button>
             <button
               type="submit"
-              disabled={!password}
+              disabled={!password || verifying}
               className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-40"
             >
-              <Trash2 className="w-4 h-4" />
-              حذف
+              {verifying
+                ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                : <Trash2 className="w-4 h-4" />}
+              {verifying ? "جارٍ التحقق…" : "حذف"}
             </button>
           </div>
         </form>

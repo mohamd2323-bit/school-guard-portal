@@ -549,6 +549,7 @@ export default function Schools() {
   const [deleteTarget, setDeleteTarget] = useState<School | null>(null);
   const [deletePassword, setDeletePassword] = useState("");
   const [deletePasswordError, setDeletePasswordError] = useState("");
+  const [deletingVerifying, setDeletingVerifying] = useState(false);
   const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [unauthorizedMsg, setUnauthorizedMsg] = useState<string | null>(null);
 
@@ -610,12 +611,27 @@ export default function Schools() {
     setShowDeletePassword(false);
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!deleteTarget || !currentUser) return;
-    if (deletePassword !== currentUser.password) {
-      setDeletePasswordError("كلمة المرور غير صحيحة");
+    setDeletingVerifying(true);
+    try {
+      const res = await fetch("/api/auth/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: currentUser.username, password: deletePassword }),
+      });
+      const data = await res.json() as { ok: boolean };
+      if (!data.ok) {
+        setDeletePasswordError("كلمة المرور غير صحيحة");
+        setDeletingVerifying(false);
+        return;
+      }
+    } catch {
+      setDeletePasswordError("تعذر التحقق من كلمة المرور، حاول مجدداً");
+      setDeletingVerifying(false);
       return;
     }
+    setDeletingVerifying(false);
     deleteSchool(deleteTarget.id, {
       username: currentUser.username,
       schoolName: deleteTarget.name,
@@ -980,10 +996,13 @@ export default function Schools() {
             <div className="flex gap-3 pt-1">
               <button
                 onClick={handleDelete}
-                disabled={!deletePassword}
-                className="flex-1 bg-red-600 text-white py-2.5 rounded-xl text-sm font-bold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                disabled={!deletePassword || deletingVerifying}
+                className="flex-1 bg-red-600 text-white py-2.5 rounded-xl text-sm font-bold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
               >
-                تأكيد الحذف
+                {deletingVerifying
+                  ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  : null}
+                {deletingVerifying ? "جارٍ التحقق…" : "تأكيد الحذف"}
               </button>
               <button
                 onClick={() => { setDeleteTarget(null); setDeletePassword(""); setDeletePasswordError(""); }}

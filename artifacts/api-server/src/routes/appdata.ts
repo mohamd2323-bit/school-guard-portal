@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { db, appDataTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
+import bcrypt from "bcryptjs";
+
+const BCRYPT_ROUNDS = 12;
 
 const router = Router();
 
@@ -80,15 +83,24 @@ router.get("/employees", async (req, res) => {
   }
 });
 
-/** PUT /api/employees — replace entire employees array */
+/** PUT /api/employees — replace entire employees array (hashes any plain-text passwords) */
 router.put("/employees", async (req, res) => {
   try {
-    const employees = req.body as unknown[];
+    const employees = req.body as Array<Record<string, unknown>>;
     if (!Array.isArray(employees)) {
       res.status(400).json({ error: "البيانات غير صالحة" });
       return;
     }
-    await setCollection("employees", employees);
+    const hashed = await Promise.all(
+      employees.map(async (emp) => {
+        const pw = emp["password"];
+        if (typeof pw === "string" && pw.length > 0 && !pw.startsWith("$2")) {
+          return { ...emp, password: await bcrypt.hash(pw, BCRYPT_ROUNDS) };
+        }
+        return emp;
+      })
+    );
+    await setCollection("employees", hashed);
     res.json({ ok: true });
   } catch (err) {
     req.log.error(err, "PUT /employees failed");
@@ -118,22 +130,59 @@ router.post("/auth/login", async (req, res) => {
       status: string;
     }>;
 
-    const user = employees.find(
-      (e) =>
-        e.username === username.trim() &&
-        e.password === password &&
-        e.status === "نشط"
+    const candidate = employees.find(
+      (e) => e.username === username.trim() && e.status === "نشط"
     );
 
-    if (!user) {
+    const passwordMatch =
+      candidate != null &&
+      (await bcrypt.compare(password, candidate.password));
+
+    if (!passwordMatch || !candidate) {
       res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة، أو الحساب غير نشط" });
       return;
     }
 
-    res.json(user);
+    const { password: _pw, ...safeUser } = candidate;
+    res.json(safeUser);
   } catch (err) {
     req.log.error(err, "POST /auth/login failed");
     res.status(500).json({ error: "خطأ في تسجيل الدخول" });
+  }
+});
+
+/** POST /api/auth/verify — confirm the calling user's password (for destructive-action dialogs) */
+router.post("/auth/verify", async (req, res) => {
+  try {
+    const { username, password } = req.body as {
+      username?: string;
+      password?: string;
+    };
+
+    if (!username || !password) {
+      res.status(400).json({ ok: false });
+      return;
+    }
+
+    const employees = await getCollection("employees") as Array<{
+      id: string;
+      username: string;
+      password: string;
+      status: string;
+    }>;
+
+    const candidate = employees.find(
+      (e) => e.username === username.trim() && e.status === "نشط"
+    );
+
+    const match =
+      candidate != null &&
+      (await bcrypt.compare(password, candidate.password));
+
+    res.json({ ok: match });
+  } catch (err) {
+    req.log.error(err, "POST /auth/verify failed");
+    res.status(500).json({ ok: false });
   }
 });
 

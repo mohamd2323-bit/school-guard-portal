@@ -1,6 +1,6 @@
 {
   "id": "backup-prod-2026-05-26T08-35-24",
-  "label": "نسخة احتياطية كاملة — الإنتاج — ٢٦ مايو ٢٠٢٦ ٨:٣٥:٢٤ ص",
+  "label": "نسخة احتياطية كاملة — الإنتاج — ٢٦ مايو ٢٠٢٦ ٨:٣٥:٢٤ ص (كلمات المرور مشفرة)",
   "createdAt": "2026-05-26T08:35:24.218Z",
   "source": "production",
   "sourceUrl": "https://school-guard-portal.replit.app",
@@ -98388,7 +98388,7 @@
         "role": "موظف عمليات",
         "status": "نشط",
         "jobTitle": "",
-        "password": "sr@2323",
+        "password": "$2b$12$EHK/lFGhyeA5kavybOdsPexKUUlQ1iCcK0yLd7FQ2YYZcT6bIyS.u",
         "username": "sarah",
         "createdAt": "2026-05-22T20:10:19.019Z"
       },
@@ -98398,7 +98398,7 @@
         "role": "موظف عمليات",
         "status": "نشط",
         "jobTitle": "موظف",
-        "password": "sh@2323",
+        "password": "$2b$12$kJBg7dofXjEMB69uy3myB.KdbtttaaL2uV/4iIdGNYodNd0CISm4S",
         "username": "s7ab",
         "createdAt": "2026-05-20T08:46:35.343Z",
         "lastLogin": "2026-05-20T08:55:22.944Z"
@@ -98409,7 +98409,7 @@
         "role": "موظف عمليات",
         "status": "نشط",
         "jobTitle": "",
-        "password": "sl@2323",
+        "password": "$2b$12$H25nLZLsDd0HJODIxi6UhuZiFw8bR5r4MAT12.ApXYXGH9MO2F6FW",
         "username": "salman",
         "createdAt": "2026-05-18T10:14:46.716Z",
         "lastLogin": "2026-05-20T07:54:52.221Z"
@@ -98420,11 +98420,12 @@
         "role": "مدير النظام",
         "status": "نشط",
         "jobTitle": "الأمن المدرسي",
-        "password": "m@2323",
+        "password": "$2b$12$d6l23fPyVH40NP30D6Hn4u0n7cFK3p4rPdGw9pZbqZL4sv.VaJuFq",
         "username": "mohamd",
         "createdAt": "2024-01-01T00:00:00.000Z",
         "lastLogin": "2026-05-22T09:36:41.450Z"
       }
     ]
-  }
+  },
+  "passwordsHashed": true
 }
