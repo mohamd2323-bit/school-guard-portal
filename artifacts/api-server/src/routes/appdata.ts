@@ -49,6 +49,7 @@ router.get("/appdata", async (req, res) => {
         result[row.key] = (row.value as unknown[]) ?? [];
       }
     }
+    res.set("Cache-Control", "no-store");
     res.json(result);
   } catch (err) {
     req.log.error(err, "GET /appdata failed");
@@ -76,6 +77,7 @@ router.put("/appdata", async (req, res) => {
 router.get("/employees", async (req, res) => {
   try {
     const employees = await getCollection("employees");
+    res.set("Cache-Control", "no-store");
     res.json(employees);
   } catch (err) {
     req.log.error(err, "GET /employees failed");
@@ -192,6 +194,7 @@ router.post("/auth/verify", async (req, res) => {
 router.get("/backups", async (req, res) => {
   try {
     const snapshots = await getCollection("backups");
+    res.set("Cache-Control", "no-store");
     res.json(snapshots);
   } catch (err) {
     req.log.error(err, "GET /backups failed");

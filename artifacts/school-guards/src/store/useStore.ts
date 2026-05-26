@@ -109,7 +109,7 @@ let listeners: Array<() => void> = [];
 let sharedData: AppData = { ...EMPTY_DATA };
 let sharedBackups: BackupSnapshot[] = [];
 let sharedLoading = true;
-let fetchStarted = false;
+let fetchInProgress = false;
 let sharedSaveError: string | null = null;
 
 function notifyAll() {
@@ -121,9 +121,13 @@ function setSaveError(msg: string | null) {
   notifyAll();
 }
 
-async function initData() {
-  if (fetchStarted) return;
-  fetchStarted = true;
+async function fetchData(showLoadingSpinner = false) {
+  if (fetchInProgress) return;
+  fetchInProgress = true;
+  if (showLoadingSpinner) {
+    sharedLoading = true;
+    notifyAll();
+  }
   try {
     [sharedData, sharedBackups] = await Promise.all([
       loadDataFromApi(),
@@ -131,17 +135,35 @@ async function initData() {
     ]);
   } catch (err) {
     console.error("Failed to load app data:", err);
-    sharedData = { ...EMPTY_DATA };
-    sharedBackups = [];
+    if (showLoadingSpinner) {
+      sharedData = { ...EMPTY_DATA };
+      sharedBackups = [];
+    }
   } finally {
+    fetchInProgress = false;
     sharedLoading = false;
     notifyAll();
   }
 }
 
+/** Re-fetch all data from the server and notify all listeners. */
+export function refreshStore() {
+  void fetchData(false);
+}
+
 // Auto-start loading when the module is imported so App.tsx's loading screen
 // doesn't deadlock waiting for a useStore() consumer that never mounts.
-void initData();
+void fetchData(true);
+
+// Re-fetch whenever the user returns to this browser tab so data stays current
+// across multiple open tabs or after changes made from another device/session.
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      void fetchData(false);
+    }
+  });
+}
 
 // ─── Backup functions (used directly by DataManagement.tsx) ───────────────────
 
@@ -239,7 +261,7 @@ export function useStore() {
   useEffect(() => {
     const listener = () => forceUpdate((n) => n + 1);
     listeners.push(listener);
-    initData();
+    void fetchData(false);
     return () => {
       listeners = listeners.filter((l) => l !== listener);
     };
