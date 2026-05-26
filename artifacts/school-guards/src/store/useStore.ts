@@ -109,7 +109,9 @@ let listeners: Array<() => void> = [];
 let sharedData: AppData = { ...EMPTY_DATA };
 let sharedBackups: BackupSnapshot[] = [];
 let sharedLoading = true;
+let sharedSaving = false;
 let fetchInProgress = false;
+let activeSaveCount = 0;   // how many PUT requests are currently in-flight
 let sharedSaveError: string | null = null;
 
 function notifyAll() {
@@ -121,20 +123,27 @@ function setSaveError(msg: string | null) {
   notifyAll();
 }
 
+// Block any background re-fetch while a PUT is still in-flight.
+// This prevents the race condition where navigating between pages triggers
+// a GET that returns stale server data and overwrites the optimistic update.
 async function fetchData(showLoadingSpinner = false) {
   if (fetchInProgress) return;
+  if (activeSaveCount > 0) return;   // wait for pending saves first
   fetchInProgress = true;
   if (showLoadingSpinner) {
     sharedLoading = true;
     notifyAll();
   }
   try {
+    const tag = `[store:fetch@${Date.now()}]`;
+    console.info(`${tag} GET /api/appdata`);
     [sharedData, sharedBackups] = await Promise.all([
       loadDataFromApi(),
       loadBackupsFromApi(),
     ]);
+    console.info(`${tag} ✓ guards:${sharedData.guards.length} schools:${sharedData.schools.length}`);
   } catch (err) {
-    console.error("Failed to load app data:", err);
+    console.error("[store] Fetch failed:", err);
     if (showLoadingSpinner) {
       sharedData = { ...EMPTY_DATA };
       sharedBackups = [];
@@ -146,9 +155,44 @@ async function fetchData(showLoadingSpinner = false) {
   }
 }
 
+// Persist data to the server.
+// - Blocks concurrent re-fetches while the PUT is in-flight (via activeSaveCount).
+// - After all in-flight saves complete, triggers a server re-fetch to confirm.
+// - On failure: throws so the caller can rollback the optimistic update.
+async function persistData(data: AppData): Promise<void> {
+  activeSaveCount++;
+  sharedSaving = true;
+  notifyAll();
+  const tag = `[store:save@${Date.now()}]`;
+  try {
+    console.info(`${tag} PUT /api/appdata — guards:${data.guards.length} schools:${data.schools.length}`);
+    await saveDataToApi(data);
+    console.info(`${tag} ✓ server confirmed`);
+    if (sharedSaveError) setSaveError(null);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`${tag} ✗ save failed: ${msg}`);
+    setSaveError("فشل حفظ البيانات في قاعدة البيانات. يرجى المحاولة مرة أخرى.");
+    throw err;   // let caller rollback
+  } finally {
+    activeSaveCount = Math.max(0, activeSaveCount - 1);
+    sharedSaving = activeSaveCount > 0;
+    notifyAll();
+    // When the last in-flight save finishes, re-fetch to confirm server state.
+    if (activeSaveCount === 0) {
+      void fetchData(false);
+    }
+  }
+}
+
 /** Re-fetch all data from the server and notify all listeners. */
 export function refreshStore() {
   void fetchData(false);
+}
+
+/** True while any PUT /api/appdata is in-flight. */
+export function isSaving() {
+  return sharedSaving;
 }
 
 // Auto-start loading when the module is imported so App.tsx's loading screen
@@ -268,14 +312,17 @@ export function useStore() {
   }, []);
 
   const setData = useCallback((data: AppData) => {
-    sharedData = data;
+    const prev = sharedData;   // capture for rollback
+    sharedData = data;         // optimistic update
     notifyAll();
-    saveDataToApi(data)
-      .then(() => { if (sharedSaveError) setSaveError(null); })
-      .catch((err: unknown) => {
-        console.error("Save failed:", err);
-        setSaveError("فشل حفظ البيانات في قاعدة البيانات. يرجى التحقق من الاتصال.");
-      });
+
+    persistData(data).catch(() => {
+      // Server rejected the write — restore previous state so UI is consistent
+      // with what the database actually contains.
+      console.warn("[store] Rolling back optimistic update due to save failure");
+      sharedData = prev;
+      notifyAll();
+    });
   }, []);
 
   // ── Import / demo ──────────────────────────────────────────────────────────
@@ -529,6 +576,7 @@ export function useStore() {
     operations: sharedData.operations,
     violations: sharedData.violations,
     loading: sharedLoading,
+    saving: sharedSaving,
     importData,
     clearData,
     loadDemoData,
