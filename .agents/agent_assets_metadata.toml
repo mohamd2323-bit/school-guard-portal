@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "N1qAb0et9hjrUEMnw9L29"
+uri = "file://backups/prod-backup-2026-05-26T08-35-24.json"
+type = "unspecified"
+title = "نسخة احتياطية كاملة — الإنتاج — 26 مايو 2026"
