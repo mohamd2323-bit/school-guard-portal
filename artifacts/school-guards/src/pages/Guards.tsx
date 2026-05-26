@@ -32,6 +32,7 @@ interface FilterState {
   jobType: string;
   status: string;
   assignment: string;
+  noSchool: string;
 }
 
 const EMPTY_FILTERS: FilterState = {
@@ -43,7 +44,14 @@ const EMPTY_FILTERS: FilterState = {
   jobType: "",
   status: "",
   assignment: "",
+  noSchool: "",
 };
+
+function isUnassignedSchool(schoolName: string | null | undefined): boolean {
+  if (!schoolName) return true;
+  const trimmed = schoolName.trim();
+  return trimmed === "" || trimmed === "غير محدد";
+}
 
 function hasActiveFilters(f: FilterState) {
   return Object.values(f).some((v) => v !== "");
@@ -112,7 +120,7 @@ interface GuardsPersistedState {
   filters: FilterState;
 }
 
-const FILTER_URL_KEYS = ["q", "governorate", "schoolName", "gender", "jobTitle", "rank", "jobType", "status", "assignment"];
+const FILTER_URL_KEYS = ["q", "governorate", "schoolName", "gender", "jobTitle", "rank", "jobType", "status", "assignment", "noSchool"];
 
 function initGuardsState(): GuardsPersistedState {
   const p = new URLSearchParams(window.location.search);
@@ -132,6 +140,7 @@ function initGuardsState(): GuardsPersistedState {
         jobType: p.get("jobType") ?? "",
         status: status === "نشط" || status === "غير نشط" ? status : "",
         assignment: assignment === "مكلف" || assignment === "غير مكلف" ? assignment : "",
+        noSchool: p.get("noSchool") === "true" ? "true" : "",
       },
     };
   }
@@ -530,6 +539,7 @@ export default function Guards() {
     if (filters.jobType) p.set("jobType", filters.jobType);
     if (filters.status) p.set("status", filters.status);
     if (filters.assignment) p.set("assignment", filters.assignment);
+    if (filters.noSchool) p.set("noSchool", filters.noSchool);
     const qs = p.toString();
     navigate("/guards" + (qs ? "?" + qs : ""), { replace: true });
   }, [filters, search, navigate]);
@@ -581,6 +591,9 @@ export default function Guards() {
         (filters.assignment === "مكلف" && isAssigned) ||
         (filters.assignment === "غير مكلف" && !isAssigned);
 
+      const matchNoSchool =
+        !filters.noSchool || isUnassignedSchool(g.schoolName);
+
       return (
         matchSearch &&
         matchGovernorate &&
@@ -590,10 +603,17 @@ export default function Guards() {
         matchRank &&
         matchJobType &&
         matchStatus &&
-        matchAssignment
+        matchAssignment &&
+        matchNoSchool
       );
     });
   }, [guards, search, filters, assignedGuardIds]);
+
+  // Count guards with no assigned school (across ALL guards, shown on the quick-filter button)
+  const unassignedSchoolCount = useMemo(
+    () => guards.filter((g) => isUnassignedSchool(g.schoolName)).length,
+    [guards]
+  );
 
   // Counts for the assignment filter options, based on all other active filters
   const assignmentCounts = useMemo(() => {
@@ -719,6 +739,27 @@ export default function Guards() {
               className="pr-9 pl-4 py-2 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 w-52"
             />
           </div>
+          {/* Quick filter: no school assigned */}
+          {guards.length > 0 && (
+            <button
+              onClick={() => setFilter("noSchool", filters.noSchool ? "" : "true")}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-semibold transition-colors whitespace-nowrap
+                ${filters.noSchool
+                  ? "border-orange-400 bg-orange-50 text-orange-700 hover:bg-orange-100"
+                  : "border-border bg-white text-foreground hover:border-orange-300 hover:text-orange-600"}`}
+              title="عرض الحراس غير المسندين لأي مدرسة"
+            >
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${filters.noSchool ? "bg-orange-500" : "bg-muted-foreground/40"}`} />
+              غير مسندين لمدارس
+              {unassignedSchoolCount > 0 && (
+                <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
+                  filters.noSchool ? "bg-orange-200 text-orange-800" : "bg-muted text-muted-foreground"
+                }`}>
+                  {unassignedSchoolCount.toLocaleString("ar-SA")}
+                </span>
+              )}
+            </button>
+          )}
           {/* Toggle filters panel */}
           {guards.length > 0 && (
             <button
