@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
@@ -13,6 +13,10 @@ import Users from "./pages/Users";
 import LoginPage from "./pages/LoginPage";
 import { useAppLoading } from "./store/useStore";
 import { useUsers } from "./store/useUsers";
+import { useIdleTimeout } from "./hooks/useIdleTimeout";
+
+const IDLE_TIMEOUT_MS = 60 * 60 * 1000;
+export const IDLE_LOGOUT_MSG_KEY = "idle_logout_msg";
 
 function NotFound() {
   return (
@@ -33,7 +37,6 @@ function LoadingScreen() {
   );
 }
 
-// Redirects non-admins away from admin-only routes.
 function AdminOnly({ children }: { children: React.ReactNode }) {
   const { isAdmin } = useUsers();
   const [, navigate] = useLocation();
@@ -69,12 +72,31 @@ function Router() {
   );
 }
 
+function IdleWatcher() {
+  const { logout } = useUsers();
+
+  const handleTimeout = useCallback(() => {
+    try {
+      sessionStorage.setItem(
+        IDLE_LOGOUT_MSG_KEY,
+        "تم تسجيل خروجك بسبب عدم النشاط لمدة ساعة، يرجى تسجيل الدخول مرة أخرى"
+      );
+    } catch {}
+    logout();
+  }, [logout]);
+
+  useIdleTimeout(handleTimeout, IDLE_TIMEOUT_MS);
+
+  return null;
+}
+
 function App() {
   const loading = useAppLoading();
   const { currentUser } = useUsers();
 
   return (
     <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+      {currentUser && <IdleWatcher />}
       {loading ? (
         <LoadingScreen />
       ) : !currentUser ? (

@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Shield, LogIn, Eye, EyeOff } from "lucide-react";
+import { Shield, LogIn, Eye, EyeOff, Clock } from "lucide-react";
 import { useUsers } from "../store/useUsers";
+import { IDLE_LOGOUT_MSG_KEY } from "../App";
 
 export default function LoginPage() {
   const { login } = useUsers();
@@ -9,6 +10,16 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const [idleMsg] = useState(() => {
+    try {
+      const msg = sessionStorage.getItem(IDLE_LOGOUT_MSG_KEY) ?? "";
+      if (msg) sessionStorage.removeItem(IDLE_LOGOUT_MSG_KEY);
+      return msg;
+    } catch {
+      return "";
+    }
+  });
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,6 +48,14 @@ export default function LoginPage() {
         <h1 className="text-xl font-bold leading-tight">إدارة الأمن والسلامة</h1>
         <p className="text-white/60 text-sm mt-1">تعليم عسير — نظام إدارة الحراسات المدرسية</p>
       </div>
+
+      {/* Idle timeout banner */}
+      {idleMsg && (
+        <div className="w-full max-w-sm mb-4 bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 flex items-start gap-3 shadow">
+          <Clock className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-amber-800 font-medium leading-snug">{idleMsg}</p>
+        </div>
+      )}
 
       {/* Card */}
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8">
