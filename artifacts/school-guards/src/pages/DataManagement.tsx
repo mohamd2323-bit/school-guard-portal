@@ -793,7 +793,13 @@ export default function DataManagement() {
           <button
             onClick={() => {
               if (!showExportPanel) {
-                setExportSheets({ guards: true, schools: true, operations: true, needs: true, violations: true });
+                setExportSheets({
+                  guards: guards.length > 0,
+                  schools: schools.length > 0,
+                  operations: operations.length > 0,
+                  needs: needs.length > 0,
+                  violations: violations.length > 0,
+                });
               }
               setShowExportPanel((v) => !v);
             }}
@@ -856,26 +862,34 @@ export default function DataManagement() {
                   { key: "needs", label: "الاحتياجات", count: needs.length },
                   { key: "violations", label: "المخالفات", count: violations.length },
                 ] as { key: keyof typeof exportSheets; label: string; count: number }[]
-              ).map(({ key, label, count }) => (
-                <label
-                  key={key}
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors select-none
-                    ${exportSheets[key] ? "bg-white border-teal-400 text-teal-900" : "bg-white/60 border-border text-muted-foreground"}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={exportSheets[key]}
-                    onChange={() => toggleExportSheet(key)}
-                    className="accent-teal-600 w-4 h-4 flex-shrink-0"
-                  />
-                  <span className="text-sm font-medium flex-1">{label}</span>
-                  {count > 0 ? (
-                    <span className="text-xs font-semibold bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-md">{count}</span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground/70 italic">فارغة</span>
-                  )}
-                </label>
-              ))}
+              ).map(({ key, label, count }) => {
+                const isEmpty = count === 0;
+                return (
+                  <label
+                    key={key}
+                    title={isEmpty ? "هذه الورقة فارغة — لا توجد بيانات للتصدير" : undefined}
+                    className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border transition-colors select-none
+                      ${isEmpty
+                        ? "opacity-50 cursor-not-allowed bg-muted/40 border-dashed border-border"
+                        : `cursor-pointer ${exportSheets[key] ? "bg-white border-teal-400 text-teal-900" : "bg-white/60 border-border text-muted-foreground"}`
+                      }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={exportSheets[key]}
+                      onChange={() => !isEmpty && toggleExportSheet(key)}
+                      disabled={isEmpty}
+                      className="accent-teal-600 w-4 h-4 flex-shrink-0"
+                    />
+                    <span className={`text-sm font-medium flex-1 ${isEmpty ? "line-through text-muted-foreground/60" : ""}`}>{label}</span>
+                    {count > 0 ? (
+                      <span className="text-xs font-semibold bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-md">{count}</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground/60 italic">فارغة</span>
+                    )}
+                  </label>
+                );
+              })}
             </div>
             <div className="flex gap-2 pt-1">
               <button
