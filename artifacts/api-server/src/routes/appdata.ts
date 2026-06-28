@@ -14,22 +14,62 @@ type CollectionKey = (typeof ALL_KEYS)[number];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/**
+ * Neon serverless postgres auto-suspends after inactivity. The first query
+ * after a cold start fails with "endpoint has been disabled" or "endpoint is
+ * in state: idle". We retry up to MAX_RETRIES times with an exponential backoff
+ * so callers never see a 500 caused purely by a cold-start wake-up.
+ */
+const MAX_RETRIES = 3;
+const RETRY_BASE_MS = 2000;
+
+function isNeonWakeError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    msg.includes("endpoint has been disabled") ||
+    msg.includes("The endpoint has been disabled") ||
+    msg.includes("endpoint is in state") ||
+    msg.includes("Control plane request failed") ||
+    msg.includes("ECONNRESET") ||
+    msg.includes("connection terminated unexpectedly")
+  );
+}
+
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (!isNeonWakeError(err)) throw err;
+      const delay = RETRY_BASE_MS * Math.pow(2, attempt);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastErr;
+}
+
 async function getCollection(key: CollectionKey): Promise<unknown[]> {
-  const rows = await db
-    .select()
-    .from(appDataTable)
-    .where(eq(appDataTable.key, key));
-  return (rows[0]?.value as unknown[]) ?? [];
+  return withRetry(async () => {
+    const rows = await db
+      .select()
+      .from(appDataTable)
+      .where(eq(appDataTable.key, key));
+    return (rows[0]?.value as unknown[]) ?? [];
+  });
 }
 
 async function setCollection(key: CollectionKey, value: unknown[]): Promise<void> {
-  await db
-    .insert(appDataTable)
-    .values({ key, value })
-    .onConflictDoUpdate({
-      target: appDataTable.key,
-      set: { value, updatedAt: new Date() },
-    });
+  await withRetry(() =>
+    db
+      .insert(appDataTable)
+      .values({ key, value })
+      .onConflictDoUpdate({
+        target: appDataTable.key,
+        set: { value, updatedAt: new Date() },
+      })
+  );
 }
 
 // ─── App data (guards, schools, needs, tickets, operations, violations) ───────
@@ -37,10 +77,12 @@ async function setCollection(key: CollectionKey, value: unknown[]): Promise<void
 /** GET /api/appdata — return all collections in one request */
 router.get("/appdata", async (req, res) => {
   try {
-    const rows = await db
-      .select()
-      .from(appDataTable)
-      .where(inArray(appDataTable.key, [...APP_COLLECTIONS]));
+    const rows = await withRetry(() =>
+      db
+        .select()
+        .from(appDataTable)
+        .where(inArray(appDataTable.key, [...APP_COLLECTIONS]))
+    );
 
     const result: Record<string, unknown[]> = {};
     for (const col of APP_COLLECTIONS) result[col] = [];
