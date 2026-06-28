@@ -156,16 +156,19 @@ router.put("/employees", async (req, res) => {
 
 /** POST /api/auth/login — validate credentials, return employee or 401 */
 router.post("/auth/login", async (req, res) => {
-  try {
-    const { username, password } = req.body as {
-      username?: string;
-      password?: string;
-    };
+  const { username, password } = req.body as {
+    username?: string;
+    password?: string;
+  };
 
+  try {
     if (!username || !password) {
+      req.log.warn({ username }, "login: missing username or password");
       res.status(400).json({ error: "يرجى إدخال اسم المستخدم وكلمة المرور" });
       return;
     }
+
+    const trimmed = username.trim();
 
     const employees = await getCollection("employees") as Array<{
       id: string;
@@ -174,23 +177,39 @@ router.post("/auth/login", async (req, res) => {
       status: string;
     }>;
 
-    const candidate = employees.find(
-      (e) => e.username === username.trim() && e.status === "نشط"
-    );
+    req.log.info({ employeeCount: employees.length }, "login: employees loaded from DB");
 
-    const passwordMatch =
-      candidate != null &&
-      (await bcrypt.compare(password, candidate.password));
-
-    if (!passwordMatch || !candidate) {
+    // Step 1 — does the username exist at all?
+    const byUsername = employees.find((e) => e.username === trimmed);
+    if (!byUsername) {
+      req.log.warn({ username: trimmed }, "login: REJECTED — username not found");
       res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة، أو الحساب غير نشط" });
       return;
     }
 
-    const { password: _pw, ...safeUser } = candidate;
+    // Step 2 — is the account active?
+    if (byUsername.status !== "نشط") {
+      req.log.warn({ username: trimmed, status: byUsername.status }, "login: REJECTED — account not active");
+      res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة، أو الحساب غير نشط" });
+      return;
+    }
+
+    // Step 3 — password check
+    const passwordMatch = await bcrypt.compare(password, byUsername.password);
+    if (!passwordMatch) {
+      req.log.warn({ username: trimmed }, "login: REJECTED — wrong password");
+      res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة، أو الحساب غير نشط" });
+      return;
+    }
+
+    req.log.info({ username: trimmed }, "login: SUCCESS");
+    const { password: _pw, ...safeUser } = byUsername;
     res.json(safeUser);
   } catch (err) {
-    req.log.error(err, "POST /auth/login failed");
+    req.log.error(
+      { err, username: username?.trim() },
+      "login: DB ERROR — cannot reach database"
+    );
     res.status(500).json({ error: "خطأ في تسجيل الدخول" });
   }
 });
