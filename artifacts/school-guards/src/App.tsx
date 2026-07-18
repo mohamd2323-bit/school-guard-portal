@@ -17,6 +17,19 @@ import { useIdleTimeout } from "./hooks/useIdleTimeout";
 
 const IDLE_TIMEOUT_MS = 60 * 60 * 1000;
 export const IDLE_LOGOUT_MSG_KEY = "idle_logout_msg";
+const DEFAULT_PAGE_TITLE = "وزارة التعليم | بوابة الحراسات المدرسية";
+
+const PAGE_TITLES: Record<string, string> = {
+  "/": "وزارة التعليم | لوحة التحكم",
+  "/guards": "وزارة التعليم | إدارة الحراس",
+  "/schools": "وزارة التعليم | إدارة المدارس",
+  "/operations": "وزارة التعليم | العمليات",
+  "/needs": "وزارة التعليم | الاحتياج",
+  "/violations": "وزارة التعليم | المخالفات",
+  "/tickets": "وزارة التعليم | بلاغات الدعم",
+  "/data": "وزارة التعليم | إدارة البيانات",
+  "/users": "وزارة التعليم | الإعدادات",
+};
 
 function NotFound() {
   return (
@@ -47,9 +60,18 @@ function AdminOnly({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function PageTitle() {
+  const [location] = useLocation();
+  useEffect(() => {
+    document.title = PAGE_TITLES[location] ?? DEFAULT_PAGE_TITLE;
+  }, [location]);
+  return null;
+}
+
 function Router() {
   return (
     <Layout>
+      <PageTitle />
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/guards" component={Guards} />
@@ -93,6 +115,10 @@ function IdleWatcher() {
 function App() {
   const loading = useAppLoading();
   const { currentUser } = useUsers();
+
+  useEffect(() => {
+    if (!currentUser) document.title = DEFAULT_PAGE_TITLE;
+  }, [currentUser]);
 
   return (
     <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>

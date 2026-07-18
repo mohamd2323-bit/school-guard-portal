@@ -532,6 +532,7 @@ export default function Schools() {
   const initialState = useMemo(initSchoolsState, []);
   const [search, setSearch] = useState(initialState.search);
   const [guardFilter, setGuardFilter] = useState<GuardFilter>(initialState.guardFilter);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const state: SchoolsPersistedState = { search, guardFilter };
@@ -542,6 +543,10 @@ export default function Schools() {
     const qs = p.toString();
     navigate("/schools" + (qs ? "?" + qs : ""), { replace: true });
   }, [guardFilter, search, navigate]);
+
+  useEffect(() => {
+    if (tableScrollRef.current) tableScrollRef.current.scrollTop = 0;
+  }, [guardFilter, search]);
 
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [actionModal, setActionModal] = useState<ActionModal | null>(null);
@@ -642,7 +647,7 @@ export default function Schools() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="flex h-[calc(100vh-7rem)] min-h-0 flex-col gap-5 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
@@ -718,7 +723,7 @@ export default function Schools() {
       )}
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-white shadow-sm dark:bg-card">
         {schools.length === 0 ? (
           <div className="py-20 text-center">
             <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
@@ -735,9 +740,9 @@ export default function Schools() {
         ) : filtered.length === 0 ? (
           <div className="py-16 text-center text-muted-foreground text-sm">لا توجد نتائج مطابقة</div>
         ) : (
-          <div className="overflow-x-auto">
+          <div ref={tableScrollRef} className="h-full overflow-auto">
             <table className="data-table">
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr>
                   <th>اسم المدرسة</th>
                   <th>المحافظة</th>
@@ -758,11 +763,11 @@ export default function Schools() {
                   return (
                     <tr
                       key={school.id}
-                      className={noGuard ? "bg-orange-50/60 hover:bg-orange-50" : undefined}
+                      className={noGuard ? "bg-orange-50/60 text-orange-950 hover:bg-orange-50 dark:bg-orange-950/30 dark:text-orange-100 dark:hover:bg-orange-950/45" : undefined}
                     >
                       {/* School name */}
                       <td>
-                        <p className={`font-semibold ${noGuard ? "text-orange-900" : "text-foreground"}`}>
+                        <p className={`font-semibold ${noGuard ? "text-orange-950 dark:text-orange-100" : "text-card-foreground"}`}>
                           {school.name}
                         </p>
                       </td>

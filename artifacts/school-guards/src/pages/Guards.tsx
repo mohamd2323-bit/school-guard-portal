@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useStore } from "../store/useStore";
 import { useUsers } from "../store/useUsers";
@@ -8,6 +8,7 @@ import type { Employee } from "../store/useUsers";
 import {
   Search, FileText, Users, SlidersHorizontal, X, Briefcase,
   Download, Pencil, Trash2, Eye, EyeOff, Save, AlertTriangle,
+  Check, ChevronsUpDown,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -24,11 +25,11 @@ function unique(values: (string | undefined | null)[]): string[] {
 }
 
 interface FilterState {
-  governorate: string;
+  governorate: string[];
   schoolName: string;
   gender: string;
-  jobTitle: string;
-  rank: string;
+  jobTitle: string[];
+  rank: string[];
   jobType: string;
   status: string;
   assignment: string;
@@ -36,11 +37,11 @@ interface FilterState {
 }
 
 const EMPTY_FILTERS: FilterState = {
-  governorate: "",
+  governorate: [],
   schoolName: "",
   gender: "",
-  jobTitle: "",
-  rank: "",
+  jobTitle: [],
+  rank: [],
   jobType: "",
   status: "",
   assignment: "",
@@ -54,31 +55,171 @@ function isUnassignedSchool(schoolName: string | null | undefined): boolean {
 }
 
 function hasActiveFilters(f: FilterState) {
-  return Object.values(f).some((v) => v !== "");
+  return Object.values(f).some((v) => Array.isArray(v) ? v.length > 0 : v !== "");
+}
+
+function activeFilterCount(f: FilterState) {
+  return Object.values(f).reduce((total, v) => total + (Array.isArray(v) ? v.length : v ? 1 : 0), 0);
+}
+
+function toArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((v): v is string => typeof v === "string" && v !== "");
+  return typeof value === "string" && value !== "" ? [value] : [];
+}
+
+function matchAny(selected: string[], value: string | null | undefined) {
+  return selected.length === 0 || selected.includes(value ?? "");
 }
 
 // ─── Single select dropdown ───────────────────────────────────────────────────
 
+function selectedSummary(label: string, selectedCount: number) {
+  if (selectedCount === 0) return "الكل";
+  if (label === "المحافظة") return `${selectedCount.toLocaleString("ar-SA")} محافظات محددة`;
+  if (label === "المرتبة") return selectedCount === 2 ? "مرتبتان محددتان" : `${selectedCount.toLocaleString("ar-SA")} مراتب محددة`;
+  if (label === "المسمى الوظيفي") return `${selectedCount.toLocaleString("ar-SA")} مسميات محددة`;
+  return `${selectedCount.toLocaleString("ar-SA")} قيم محددة`;
+}
+
+function MultiFilterSelect({
+  label,
+  values,
+  options,
+  onChange,
+  searchable = false,
+}: {
+  label: string;
+  values: string[];
+  options: string[];
+  onChange: (values: string[]) => void;
+  searchable?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const selected = new Set(values);
+  const filteredOptions = useMemo(() => {
+    const q = query.trim();
+    if (!q) return options;
+    return options.filter((option) => option.includes(q));
+  }, [options, query]);
+  const active = values.length > 0;
+
+  const toggleValue = (value: string) => {
+    onChange(selected.has(value) ? values.filter((v) => v !== value) : [...values, value]);
+  };
+
+  return (
+    <div className="relative flex min-w-0 flex-col gap-1">
+      <label className="text-xs font-semibold text-muted-foreground">{label}</label>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`flex w-full items-center justify-between gap-2 rounded-lg border bg-white px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30 dark:bg-card
+          ${active ? "border-primary text-primary font-semibold" : "border-border text-foreground"}`}
+      >
+        <span className="truncate">{selectedSummary(label, values.length)}</span>
+        <ChevronsUpDown className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full z-30 mt-2 w-full min-w-[240px] overflow-hidden rounded-xl border border-border bg-white shadow-xl dark:bg-card">
+          <div className="border-b border-border p-2">
+            {searchable && (
+              <div className="relative mb-2">
+                <Search className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="بحث..."
+                  className="w-full rounded-lg border border-border bg-background py-2 pr-8 pl-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => onChange(options)}
+                className="rounded-md px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
+              >
+                تحديد الكل
+              </button>
+              <button
+                type="button"
+                onClick={() => onChange([])}
+                className="rounded-md px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+              >
+                مسح الكل
+              </button>
+            </div>
+          </div>
+
+          <div className="max-h-[min(18rem,55vh)] overflow-y-auto p-1">
+            {filteredOptions.length === 0 ? (
+              <p className="px-3 py-4 text-center text-sm text-muted-foreground">لا توجد نتائج</p>
+            ) : (
+              filteredOptions.map((option) => {
+                const checked = selected.has(option);
+                return (
+                  <label
+                    key={option}
+                    className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground hover:bg-accent"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleValue(option)}
+                      className="h-4 w-4 rounded border-border accent-primary"
+                    />
+                    <span className="min-w-0 flex-1 truncate">{option}</span>
+                    {checked && <Check className="h-3.5 w-3.5 flex-shrink-0 text-primary" />}
+                  </label>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FilterSelect({
   label,
   value,
+  values,
   options,
   onChange,
   optionCounts,
+  searchable,
 }: {
   label: string;
-  value: string;
+  value?: string;
+  values?: string[];
   options: string[];
-  onChange: (v: string) => void;
+  onChange: (v: string | string[]) => void;
   optionCounts?: Record<string, number>;
+  searchable?: boolean;
 }) {
-  const active = value !== "";
+  if (values) {
+    return (
+      <MultiFilterSelect
+        label={label}
+        values={values}
+        options={options}
+        onChange={onChange as (values: string[]) => void}
+        searchable={searchable}
+      />
+    );
+  }
+
+  const currentValue = value ?? "";
+  const active = currentValue !== "";
   return (
     <div className="flex flex-col gap-1 min-w-0">
       <label className="text-xs font-semibold text-muted-foreground">{label}</label>
       <div className="relative">
         <select
-          value={value}
+          value={currentValue}
           onChange={(e) => onChange(e.target.value)}
           className={`w-full appearance-none pl-7 pr-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white transition-colors
             ${active ? "border-primary text-primary font-semibold" : "border-border text-foreground"}`}
@@ -132,11 +273,11 @@ function initGuardsState(): GuardsPersistedState {
     return {
       search: p.get("q") ?? "",
       filters: {
-        governorate: p.get("governorate") ?? "",
+        governorate: p.getAll("governorate").filter(Boolean),
         schoolName: p.get("schoolName") ?? "",
         gender: gender === "ذكر" || gender === "أنثى" ? gender : "",
-        jobTitle: p.get("jobTitle") ?? "",
-        rank: p.get("rank") ?? "",
+        jobTitle: p.getAll("jobTitle").filter(Boolean),
+        rank: p.getAll("rank").filter(Boolean),
         jobType: p.get("jobType") ?? "",
         status: status === "نشط" || status === "غير نشط" ? status : "",
         assignment: assignment === "مكلف" || assignment === "غير مكلف" ? assignment : "",
@@ -148,7 +289,18 @@ function initGuardsState(): GuardsPersistedState {
     const raw = sessionStorage.getItem(GUARDS_STORAGE_KEY);
     if (raw) {
       const stored = JSON.parse(raw) as GuardsPersistedState;
-      if (stored && typeof stored.filters === "object") return stored;
+      if (stored && typeof stored.filters === "object") {
+        return {
+          search: stored.search ?? "",
+          filters: {
+            ...EMPTY_FILTERS,
+            ...stored.filters,
+            governorate: toArray(stored.filters.governorate),
+            jobTitle: toArray(stored.filters.jobTitle),
+            rank: toArray(stored.filters.rank),
+          },
+        };
+      }
     }
   } catch {}
   return { search: "", filters: EMPTY_FILTERS };
@@ -523,19 +675,20 @@ export default function Guards() {
   const [search, setSearch] = useState(initialState.search);
   const [filters, setFilters] = useState<FilterState>(initialState.filters);
   const [filtersOpen, setFiltersOpen] = useState(
-    () => Object.values(initialState.filters).some((v) => v !== "") || initialState.search !== ""
+    () => hasActiveFilters(initialState.filters) || initialState.search !== ""
   );
+  const tableScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const state: GuardsPersistedState = { search, filters };
     try { sessionStorage.setItem(GUARDS_STORAGE_KEY, JSON.stringify(state)); } catch {}
     const p = new URLSearchParams();
     if (search) p.set("q", search);
-    if (filters.governorate) p.set("governorate", filters.governorate);
+    filters.governorate.forEach((value) => p.append("governorate", value));
     if (filters.schoolName) p.set("schoolName", filters.schoolName);
     if (filters.gender) p.set("gender", filters.gender);
-    if (filters.jobTitle) p.set("jobTitle", filters.jobTitle);
-    if (filters.rank) p.set("rank", filters.rank);
+    filters.jobTitle.forEach((value) => p.append("jobTitle", value));
+    filters.rank.forEach((value) => p.append("rank", value));
     if (filters.jobType) p.set("jobType", filters.jobType);
     if (filters.status) p.set("status", filters.status);
     if (filters.assignment) p.set("assignment", filters.assignment);
@@ -543,6 +696,10 @@ export default function Guards() {
     const qs = p.toString();
     navigate("/guards" + (qs ? "?" + qs : ""), { replace: true });
   }, [filters, search, navigate]);
+
+  useEffect(() => {
+    if (tableScrollRef.current) tableScrollRef.current.scrollTop = 0;
+  }, [filters, search]);
 
   const [selectedGuard, setSelectedGuard] = useState<Guard | null>(null);
   const [editTarget, setEditTarget] = useState<Guard | null>(null);
@@ -559,12 +716,12 @@ export default function Guards() {
     status: unique(guards.map((g) => g.status)),
   }), [guards]);
 
-  const setFilter = (key: keyof FilterState, value: string) =>
+  const setFilter = (key: keyof FilterState, value: FilterState[typeof key]) =>
     setFilters((prev) => ({ ...prev, [key]: value }));
 
   const clearFilters = () => setFilters(EMPTY_FILTERS);
 
-  const activeCount = Object.values(filters).filter((v) => v !== "").length;
+  const activeCount = activeFilterCount(filters);
 
   const filtered = useMemo(() => {
     return guards.filter((g) => {
@@ -578,11 +735,11 @@ export default function Guards() {
         (g.jobType || "").includes(q) ||
         (g.rank || "").includes(q);
 
-      const matchGovernorate = !filters.governorate || g.governorate === filters.governorate;
+      const matchGovernorate = matchAny(filters.governorate, g.governorate);
       const matchSchool = !filters.schoolName || g.schoolName === filters.schoolName;
       const matchGender = !filters.gender || g.gender === filters.gender;
-      const matchJobTitle = !filters.jobTitle || g.jobTitle === filters.jobTitle;
-      const matchRank = !filters.rank || g.rank === filters.rank;
+      const matchJobTitle = matchAny(filters.jobTitle, g.jobTitle);
+      const matchRank = matchAny(filters.rank, g.rank);
       const matchJobType = !filters.jobType || g.jobType === filters.jobType;
       const matchStatus = !filters.status || g.status === filters.status;
       const isAssigned = assignedGuardIds.has(g.id);
@@ -629,11 +786,11 @@ export default function Guards() {
         (g.schoolName || "").includes(q) ||
         (g.jobType || "").includes(q) ||
         (g.rank || "").includes(q);
-      const matchGovernorate = !filters.governorate || g.governorate === filters.governorate;
+      const matchGovernorate = matchAny(filters.governorate, g.governorate);
       const matchSchool = !filters.schoolName || g.schoolName === filters.schoolName;
       const matchGender = !filters.gender || g.gender === filters.gender;
-      const matchJobTitle = !filters.jobTitle || g.jobTitle === filters.jobTitle;
-      const matchRank = !filters.rank || g.rank === filters.rank;
+      const matchJobTitle = matchAny(filters.jobTitle, g.jobTitle);
+      const matchRank = matchAny(filters.rank, g.rank);
       const matchJobType = !filters.jobType || g.jobType === filters.jobType;
       const matchStatus = !filters.status || g.status === filters.status;
       if (matchSearch && matchGovernorate && matchSchool && matchGender && matchJobTitle && matchRank && matchJobType && matchStatus) {
@@ -713,7 +870,7 @@ export default function Guards() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-[calc(100vh-7rem)] min-h-0 flex-col gap-4 overflow-hidden">
       {/* ── Header row ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
@@ -794,13 +951,14 @@ export default function Guards() {
 
       {/* ── Filter panel ───────────────────────────────────────────────────── */}
       {guards.length > 0 && filtersOpen && (
-        <div className="bg-white border border-border rounded-xl shadow-sm p-4 space-y-4">
+        <div className="bg-white border border-border rounded-xl shadow-sm p-4 space-y-4 dark:bg-card">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
             <FilterSelect
               label="المحافظة"
-              value={filters.governorate}
+              values={filters.governorate}
               options={options.governorate}
               onChange={(v) => setFilter("governorate", v)}
+              searchable
             />
             <FilterSelect
               label="المدرسة"
@@ -816,15 +974,16 @@ export default function Guards() {
             />
             <FilterSelect
               label="المسمى الوظيفي"
-              value={filters.jobTitle}
+              values={filters.jobTitle}
               options={options.jobTitle}
-              onChange={(v) => setFilter("jobTitle", v)}
+              onChange={(v) => setFilter("jobTitle", v as string[])}
+              searchable
             />
             <FilterSelect
               label="المرتبة"
-              value={filters.rank}
+              values={filters.rank}
               options={options.rank}
-              onChange={(v) => setFilter("rank", v)}
+              onChange={(v) => setFilter("rank", v as string[])}
             />
             <FilterSelect
               label="نوع الوظيفة"
@@ -847,6 +1006,34 @@ export default function Guards() {
             />
           </div>
 
+          {(filters.governorate.length > 0 || filters.jobTitle.length > 0 || filters.rank.length > 0) && (
+            <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+              {([
+                ["governorate", "المحافظة", filters.governorate],
+                ["jobTitle", "المسمى الوظيفي", filters.jobTitle],
+                ["rank", "المرتبة", filters.rank],
+              ] as const).flatMap(([key, label, values]) =>
+                values.map((value) => (
+                  <span
+                    key={`${key}-${value}`}
+                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary"
+                  >
+                    <span className="text-primary/70">{label}:</span>
+                    <span className="truncate">{value}</span>
+                    <button
+                      type="button"
+                      onClick={() => setFilter(key, values.filter((v) => v !== value))}
+                      className="rounded-full p-0.5 hover:bg-primary/15"
+                      aria-label={`إزالة ${value}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))
+              )}
+            </div>
+          )}
+
           {/* Clear button */}
           {hasActiveFilters(filters) && (
             <div className="flex items-center justify-between pt-1 border-t border-border">
@@ -868,7 +1055,7 @@ export default function Guards() {
       )}
 
       {/* ── Table ──────────────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-white shadow-sm dark:bg-card">
         {guards.length === 0 ? (
           <div className="py-20 text-center">
             <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
@@ -893,9 +1080,9 @@ export default function Guards() {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div ref={tableScrollRef} className="h-full overflow-auto">
             <table className="data-table">
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr>
                   <th className="w-36">إجراءات</th>
                   <th>اسم الحارس</th>

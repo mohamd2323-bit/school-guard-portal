@@ -1,0 +1,75 @@
+name: school-guard-portal
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-school_guard}
+      POSTGRES_USER: ${POSTGRES_USER:-school_guard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-school_guard_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      target: api
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://${POSTGRES_USER:-school_guard}:${POSTGRES_PASSWORD:-school_guard_password}@postgres:5432/${POSTGRES_DB:-school_guard}
+    ports:
+      - "${API_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  web:
+    build:
+      context: .
+      target: web
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  import-appdata:
+    profiles: ["import"]
+    build:
+      context: .
+      target: tools
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-school_guard}:${POSTGRES_PASSWORD:-school_guard_password}@host.docker.internal:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-school_guard}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command:
+      [
+        "sh",
+        "-c",
+        "pnpm --filter @workspace/db run push && pnpm --filter @workspace/scripts run import:appdata:local /app/backups/production-appdata-2026-07-18.json",
+      ]
+
+volumes:
+  postgres_data:

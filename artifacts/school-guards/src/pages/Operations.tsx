@@ -1,7 +1,9 @@
 import { useState, useMemo, useRef, useEffect } from "react";
+import * as XLSX from "xlsx";
 import { useStore } from "../store/useStore";
 import { useUsers } from "../store/useUsers";
 import type { Guard, School, Operation, OperationType } from "../types";
+import moeLogo from "../assets/images/moe-logo.png";
 import {
   ArrowLeftRight,
   UserPlus,
@@ -604,29 +606,6 @@ function buildLetterHTML(l: LetterData): string {
     ? `وحتى تاريخ ${formatDateAr(l.endDate)}`
     : "حتى إشعار آخر";
 
-  /* Saudi Ministry of Education emblem — simplified SVG in teal */
-  const emblemSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="90" height="90">
-    <!-- Palm tree trunk -->
-    <rect x="56" y="55" width="8" height="38" rx="3" fill="#1a7a6e"/>
-    <!-- Palm fronds -->
-    <ellipse cx="60" cy="38" rx="5" ry="18" fill="#1a7a6e" transform="rotate(-35 60 55)"/>
-    <ellipse cx="60" cy="38" rx="5" ry="18" fill="#1a7a6e" transform="rotate(35 60 55)"/>
-    <ellipse cx="60" cy="34" rx="4" ry="20" fill="#1a7a6e" transform="rotate(-65 60 55)"/>
-    <ellipse cx="60" cy="34" rx="4" ry="20" fill="#1a7a6e" transform="rotate(65 60 55)"/>
-    <ellipse cx="60" cy="32" rx="3" ry="16" fill="#1a7a6e" transform="rotate(-90 60 55)"/>
-    <ellipse cx="60" cy="32" rx="3" ry="16" fill="#1a7a6e" transform="rotate(90 60 55)"/>
-    <!-- Left sword -->
-    <line x1="15" y1="90" x2="50" y2="55" stroke="#1a7a6e" stroke-width="4" stroke-linecap="round"/>
-    <polygon points="10,95 15,90 20,98" fill="#1a7a6e"/>
-    <rect x="10" y="86" width="14" height="4" rx="2" fill="#c8a84b" transform="rotate(-45 17 88)"/>
-    <!-- Right sword -->
-    <line x1="105" y1="90" x2="70" y2="55" stroke="#1a7a6e" stroke-width="4" stroke-linecap="round"/>
-    <polygon points="110,95 105,90 100,98" fill="#1a7a6e"/>
-    <rect x="96" y="86" width="14" height="4" rx="2" fill="#c8a84b" transform="rotate(45 103 88)"/>
-    <!-- Base ground line -->
-    <line x1="20" y1="94" x2="100" y2="94" stroke="#1a7a6e" stroke-width="2.5" stroke-linecap="round"/>
-  </svg>`;
-
   return `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
@@ -665,19 +644,26 @@ function buildLetterHTML(l: LetterData): string {
       border-bottom: 4px double #1a7a6e;
     }
 
-    /* Right block: logo + identity */
+    /* Right block: official identity */
     .identity-block {
       display: flex;
       align-items: center;
-      gap: 28px;
       flex: 1;
     }
 
-    .emblem-wrapper {
+    .logo-block {
       flex-shrink: 0;
-      width: 90px;
-      height: 90px;
-      margin-right: -8px;
+      width: 260px;
+      display: flex;
+      justify-content: flex-end;
+      align-items: flex-start;
+    }
+
+    .official-logo {
+      display: block;
+      width: 260px;
+      height: 180px;
+      object-fit: contain;
     }
 
     .identity-text {
@@ -712,13 +698,18 @@ function buildLetterHTML(l: LetterData): string {
       color: #666;
     }
 
-    /* Left block: Letter metadata */
+    /* Letter metadata */
+    .meta-strip {
+      display: flex;
+      justify-content: flex-start;
+      margin: 12px 0 18px;
+    }
+
     .meta-left {
-      flex-shrink: 0;
       text-align: right;
       border: 1px solid #c8e6e0;
       border-radius: 8px;
-      padding: 12px 16px;
+      padding: 9px 14px;
       background: #f4faf9;
       min-width: 148px;
     }
@@ -893,6 +884,7 @@ function buildLetterHTML(l: LetterData): string {
       .stamp-circle { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       .subject { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       .meta-left { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .official-logo { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     }
   </style>
 </head>
@@ -904,7 +896,6 @@ function buildLetterHTML(l: LetterData): string {
 
     <!-- RIGHT: Ministry logo + identity (RTL = appears on right) -->
     <div class="identity-block">
-      <div class="emblem-wrapper">${emblemSVG}</div>
       <div class="identity-text">
         <p class="id-kingdom">المملكة العربية السعودية</p>
         <p class="id-ministry">وزارة التعليم</p>
@@ -914,7 +905,13 @@ function buildLetterHTML(l: LetterData): string {
       </div>
     </div>
 
-    <!-- LEFT: Letter metadata -->
+    <div class="logo-block">
+      <img class="official-logo" src="${moeLogo}" alt="شعار وزارة التعليم" />
+    </div>
+
+  </div>
+
+  <div class="meta-strip">
     <div class="meta-left">
       <table>
         <tr>
@@ -1146,7 +1143,13 @@ function AssignmentModal({ guards, onClose }: { guards: Guard[]; onClose: () => 
                   <p className="text-[11px] text-foreground/70 font-semibold">إدارة الأمن والسلامة والمرافق</p>
                   <p className="text-[10px] text-muted-foreground">الأمن المدرسي — تعليم عسير</p>
                 </div>
-                {/* Left: metadata */}
+                <div className="flex w-64 shrink-0 justify-end">
+                  <img src={moeLogo} alt="شعار وزارة التعليم" className="h-44 w-64 object-contain" draggable={false} />
+                </div>
+              </div>
+
+              <div className="flex justify-start px-5 pt-3">
+                {/* Letter metadata */}
                 <div className="text-right border border-primary/20 bg-primary/5 rounded-lg px-3 py-2 flex-shrink-0">
                   <table className="text-xs">
                     <tbody>
@@ -1896,7 +1899,6 @@ export default function Operations() {
   }
 
   function handleExcel() {
-    import("xlsx").then((XLSX) => {
       const rows = filtered.map((op) => ({
         "نوع العملية":  op.type,
         "اسم الحارس":  op.guardName,
@@ -1909,7 +1911,6 @@ export default function Operations() {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "سجل العمليات");
       XLSX.writeFile(wb, `operations-${todayStr()}.xlsx`);
-    });
   }
 
   return (

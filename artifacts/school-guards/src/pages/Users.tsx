@@ -529,7 +529,7 @@ export default function Users() {
               {employees.map((emp, i) => {
                 const isDefault = emp.id === DEFAULT_ADMIN_ID;
                 return (
-                  <tr key={emp.id} className={emp.status === "غير نشط" ? "opacity-60" : undefined}>
+                  <tr key={emp.id} className={emp.status === "غير نشط" ? "table-row-muted" : undefined}>
                     {/* Row number */}
                     <td className="text-muted-foreground text-xs w-8 text-center">{i + 1}</td>
 

@@ -1,119 +1,120 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import {
   Users, School, UserCheck, UserX, AlertTriangle,
-  ShieldCheck, Briefcase, Wallet, ChevronDown, BarChart2,
+  ShieldCheck, Briefcase, Wallet, ChevronDown,
+  Percent, Building2, Activity, Gauge, Venus, Mars,
 } from "lucide-react";
-import {
-  ResponsiveContainer,
-  BarChart, Bar, XAxis, YAxis, Tooltip, Cell, CartesianGrid,
-  PieChart, Pie, Legend,
-} from "recharts";
 import { useStore } from "../store/useStore";
+import { useUsers } from "../store/useUsers";
 import type { Guard } from "../types";
 
-// ─── Colour palette ───────────────────────────────────────────────────────────
-
-const TEAL_SHADES = [
-  "#0f766e", "#0d9488", "#14b8a6", "#2dd4bf", "#5eead4",
-  "#99f6e4", "#1a7a6e", "#116960", "#0a5047", "#04302b",
-];
-
-const PIE_COLORS = {
-  gender: { "ذكر": "#0f766e", "أنثى": "#ec4899" },
-  status: { "نشط": "#0d9488", "غير نشط": "#94a3b8" },
-};
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function count<T>(arr: T[], key: (item: T) => string): { name: string; value: number }[] {
-  const map = new Map<string, number>();
-  arr.forEach((item) => {
-    const k = key(item) || "غير محدد";
-    map.set(k, (map.get(k) ?? 0) + 1);
-  });
-  return Array.from(map.entries())
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value);
-}
 
 function jobLabel(g: Guard) {
   return g.jobTitle?.trim() || g.jobType?.trim() || "غير محدد";
 }
 
-function govLabel(g: Guard) {
-  return g.governorate?.trim() || "غير محدد";
+function formatPercent(numerator: number, denominator: number) {
+  if (denominator <= 0) return "—";
+  return `${((numerator / denominator) * 100).toLocaleString("ar-SA", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })}%`;
+}
+
+function formatAverage(numerator: number, denominator: number) {
+  if (denominator <= 0) return "—";
+  return (numerator / denominator).toLocaleString("ar-SA", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
+}
+
+function formatFraction(numerator: number, denominator: number) {
+  if (denominator <= 0) return "—";
+  return `${numerator.toLocaleString("ar-SA")} / ${denominator.toLocaleString("ar-SA")}`;
+}
+
+function needLevel(value: number) {
+  if (value <= 50) return { label: "منخفض", color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" };
+  if (value <= 200) return { label: "متوسط", color: "text-orange-700", bg: "bg-orange-50", border: "border-orange-200" };
+  return { label: "مرتفع", color: "text-red-700", bg: "bg-red-50", border: "border-red-200" };
+}
+
+function getWelcomeMessage(now: Date) {
+  const hour = now.getHours();
+
+  if (hour >= 0 && hour < 5) {
+    return {
+      greeting: "صباح الخير",
+      icon: "🌙",
+      note: "نتمنى لك عملًا منظمًا ويومًا موفقًا",
+    };
+  }
+
+  if (hour >= 5 && hour < 12) {
+    return {
+      greeting: "صباح الخير",
+      icon: "☀️",
+      note: "نتمنى لك عملًا منظمًا ويومًا موفقًا",
+    };
+  }
+
+  if (hour >= 12 && hour < 17) {
+    return {
+      greeting: "مساء الخير",
+      icon: "🌤️",
+      note: "نتمنى لك عملًا منظمًا ويومًا موفقًا",
+    };
+  }
+
+  return {
+    greeting: "مساء الخير",
+    icon: "🌙",
+    note: "نتمنى لك عملًا منظمًا ويومًا موفقًا",
+  };
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StatCard({
-  label, value, icon: Icon, bg, iconColor, border, onClick,
+  label, value, description, badge, icon: Icon, bg, iconColor, border, onClick,
 }: {
-  label: string; value: number;
+  label: string; value: number | string;
+  description?: string;
+  badge?: { label: string; color: string; bg: string; border: string };
   icon: React.ElementType;
   bg: string; iconColor: string; border: string;
   onClick?: () => void;
 }) {
   const Wrapper = onClick ? "button" : "div";
+  const displayValue = typeof value === "number" ? value.toLocaleString("ar-SA") : value;
   return (
     <Wrapper
-      className={`bg-white rounded-2xl border ${border} p-5 flex items-center gap-4 shadow-sm w-full text-right${onClick ? " hover:shadow-md hover:scale-[1.02] transition-all cursor-pointer active:scale-100" : ""}`}
+      className={`bg-white rounded-2xl border ${border} p-5 flex items-center gap-4 shadow-sm w-full min-h-[98px] text-right${onClick ? " hover:shadow-md hover:scale-[1.02] transition-all cursor-pointer active:scale-100" : ""}`}
       {...(onClick ? { onClick } : {})}
     >
       <div className={`w-14 h-14 rounded-2xl ${bg} flex items-center justify-center flex-shrink-0`}>
         <Icon className={`w-7 h-7 ${iconColor}`} />
       </div>
-      <div>
+      <div className="min-w-0">
         <p className="text-muted-foreground text-sm leading-none">{label}</p>
         <p className="text-3xl font-bold text-foreground mt-1 tabular-nums">
-          {value.toLocaleString("ar-SA")}
+          {displayValue}
         </p>
+        {description && (
+          <p className="text-xs text-muted-foreground mt-1 tabular-nums">{description}</p>
+        )}
+        {badge && (
+          <span className={`mt-2 inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${badge.bg} ${badge.color} ${badge.border}`}>
+            {badge.label}
+          </span>
+        )}
       </div>
     </Wrapper>
   );
 }
-
-function ChartCard({ title, children, empty }: {
-  title: string; children: React.ReactNode; empty?: boolean;
-}) {
-  return (
-    <div className="bg-white rounded-2xl border border-border shadow-sm p-5 overflow-hidden">
-      <h3 className="text-sm font-bold text-foreground mb-4 border-r-4 border-primary pr-3">{title}</h3>
-      {empty ? (
-        <div className="h-40 flex items-center justify-center">
-          <p className="text-muted-foreground text-sm">لا توجد بيانات حالياً</p>
-        </div>
-      ) : (
-        <div className="overflow-hidden">{children}</div>
-      )}
-    </div>
-  );
-}
-
-const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) => {
-  if (active && payload?.length) {
-    return (
-      <div className="bg-white border border-border rounded-xl shadow-lg px-4 py-2.5 text-sm">
-        <p className="font-semibold text-foreground">{label}</p>
-        <p className="text-primary font-bold mt-0.5">{payload[0].value.toLocaleString("ar-SA")}</p>
-      </div>
-    );
-  }
-  return null;
-};
-
-const PieTooltip = ({ active, payload }: { active?: boolean; payload?: { name: string; value: number; payload: { fill: string } }[] }) => {
-  if (active && payload?.length) {
-    return (
-      <div className="bg-white border border-border rounded-xl shadow-lg px-4 py-2.5 text-sm">
-        <p className="font-semibold text-foreground">{payload[0].name}</p>
-        <p className="font-bold mt-0.5" style={{ color: payload[0].payload.fill }}>{payload[0].value.toLocaleString("ar-SA")}</p>
-      </div>
-    );
-  }
-  return null;
-};
 
 function SelectFilter({
   label, value, options, onChange,
@@ -135,95 +136,26 @@ function SelectFilter({
   );
 }
 
-// ─── Bar chart (horizontal) ───────────────────────────────────────────────────
-
-function HBarChart({ data, color = "#0f766e", maxBars = 12 }: {
-  data: { name: string; value: number }[];
-  color?: string;
-  maxBars?: number;
-}) {
-  const sliced = data.slice(0, maxBars);
-  const barH = 32;
-  const height = Math.max(sliced.length * barH + 20, 80);
-
-  return (
-    <div style={{ height }} className="w-full overflow-hidden">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={sliced} layout="vertical" margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
-          <XAxis type="number" tick={{ fontSize: 11, fill: "#888" }} allowDecimals={false} />
-          <YAxis
-            type="category"
-            dataKey="name"
-            width={120}
-            tick={{ fontSize: 11, fill: "#333", fontFamily: "Cairo, sans-serif" }}
-            orientation="right"
-          />
-          <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f0faf9" }} />
-          <Bar dataKey="value" fill={color} radius={[0, 6, 6, 0]} maxBarSize={22}>
-            {sliced.map((_, i) => (
-              <Cell key={i} fill={TEAL_SHADES[i % TEAL_SHADES.length]} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-// ─── Pie chart ────────────────────────────────────────────────────────────────
-
-function DonutChart({ data, colorMap }: {
-  data: { name: string; value: number }[];
-  colorMap?: Record<string, string>;
-}) {
-  const colored = data.map((d, i) => ({
-    ...d,
-    fill: colorMap?.[d.name] ?? TEAL_SHADES[i % TEAL_SHADES.length],
-  }));
-
-  return (
-    <div className="w-full overflow-hidden" style={{ height: 220 }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={colored}
-            cx="50%"
-            cy="50%"
-            innerRadius={55}
-            outerRadius={85}
-            dataKey="value"
-            nameKey="name"
-            paddingAngle={3}
-          >
-            {colored.map((entry, i) => (
-              <Cell key={i} fill={entry.fill} />
-            ))}
-          </Pie>
-          <Tooltip content={<PieTooltip />} />
-          <Legend
-            iconType="circle"
-            iconSize={9}
-            formatter={(value) => (
-              <span style={{ fontSize: 12, color: "#333", fontFamily: "Cairo, sans-serif" }}>{value}</span>
-            )}
-          />
-        </PieChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const { guards, schools, operations } = useStore();
+  const { guards, schools, operations, needs } = useStore();
+  const { currentUser } = useUsers();
   const [, navigate] = useLocation();
 
   const [filterGov, setFilterGov] = useState("");
   const [filterGender, setFilterGender] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterJob, setFilterJob] = useState("");
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const welcome = useMemo(() => getWelcomeMessage(now), [now]);
+  const displayName = currentUser?.name?.trim() || currentUser?.username || "مستخدم النظام";
 
   const isEmpty = guards.length === 0 && schools.length === 0;
 
@@ -258,10 +190,17 @@ export default function Dashboard() {
     [schools, filterGov]
   );
 
+  const filteredNeeds = useMemo(() =>
+    filterGov ? needs.filter((n) => n.governorate?.trim() === filterGov) : needs,
+    [needs, filterGov]
+  );
+
   // Stat computations
   const stats = useMemo(() => {
     const assignedSchoolIds = new Set(filteredGuards.map((g) => g.schoolId).filter(Boolean));
+    const linkedSchools = filteredSchools.filter((s) => assignedSchoolIds.has(s.id)).length;
     const schoolsNoGuard = filteredSchools.filter((s) => !assignedSchoolIds.has(s.id)).length;
+    const openNeeds = filteredNeeds.filter((n) => n.status === "جديد" || n.status === "تحت الإجراء").length;
 
     const assignedToOperation = (type: string) =>
       new Set(
@@ -287,32 +226,17 @@ export default function Dashboard() {
     return {
       total: filteredGuards.length,
       schools: filteredSchools.length,
+      linkedSchools,
       male: filteredGuards.filter((g) => g.gender === "ذكر").length,
       female: filteredGuards.filter((g) => g.gender === "أنثى").length,
       schoolsNoGuard,
       active: filteredGuards.filter((g) => g.status === "نشط").length,
       delegated: activeAssignmentGuardIds.size,
       allowance: assignedToOperation("بدل حارس"),
+      openNeeds,
+      needIndex: schoolsNoGuard + openNeeds,
     };
-  }, [filteredGuards, filteredSchools, operations]);
-
-  // Chart data
-  const chartData = useMemo(() => {
-    const guardsByGov = count(filteredGuards, govLabel);
-    const guardsByGender = count(filteredGuards, (g) => g.gender);
-    const guardsByStatus = count(filteredGuards, (g) => g.status);
-    const guardsByJob = count(filteredGuards, jobLabel);
-
-    const schoolsByGov = count(filteredSchools, (s) => s.governorate?.trim() || "غير محدد");
-
-    const assignedSchoolIds = new Set(filteredGuards.map((g) => g.schoolId).filter(Boolean));
-    const noGuardByGov = count(
-      filteredSchools.filter((s) => !assignedSchoolIds.has(s.id)),
-      (s) => s.governorate?.trim() || "غير محدد"
-    );
-
-    return { guardsByGov, guardsByGender, guardsByStatus, guardsByJob, schoolsByGov, noGuardByGov };
-  }, [filteredGuards, filteredSchools]);
+  }, [filteredGuards, filteredSchools, filteredNeeds, operations]);
 
   const hasFilters = filterGov || filterGender || filterStatus || filterJob;
 
@@ -358,8 +282,103 @@ export default function Dashboard() {
     { label: "الحراس الذين يتقاضون بدل", value: stats.allowance, icon: Wallet, bg: "bg-purple-50", iconColor: "text-purple-600", border: "border-purple-200" },
   ];
 
+  const hasNeedIndex = stats.schools > 0 || stats.openNeeds > 0;
+  const needStatus = needLevel(stats.needIndex);
+  const insightCards: {
+    label: string; value: number | string; description?: string;
+    badge?: { label: string; color: string; bg: string; border: string };
+    icon: React.ElementType; bg: string; iconColor: string; border: string;
+  }[] = [
+    {
+      label: "نسبة تغطية المدارس",
+      value: formatPercent(stats.linkedSchools, stats.schools),
+      description: formatFraction(stats.linkedSchools, stats.schools),
+      icon: Percent,
+      bg: "bg-teal-50",
+      iconColor: "text-teal-600",
+      border: "border-teal-200",
+    },
+    {
+      label: "نسبة المدارس بدون حارس",
+      value: formatPercent(stats.schoolsNoGuard, stats.schools),
+      description: formatFraction(stats.schoolsNoGuard, stats.schools),
+      icon: Building2,
+      bg: "bg-orange-50",
+      iconColor: "text-orange-600",
+      border: "border-orange-200",
+    },
+    {
+      label: "نسبة الحراس على رأس العمل",
+      value: formatPercent(stats.active, stats.total),
+      description: formatFraction(stats.active, stats.total),
+      icon: Activity,
+      bg: "bg-emerald-50",
+      iconColor: "text-emerald-600",
+      border: "border-emerald-200",
+    },
+    {
+      label: "نسبة الحراس المكلفين",
+      value: formatPercent(stats.delegated, stats.total),
+      description: formatFraction(stats.delegated, stats.total),
+      icon: Briefcase,
+      bg: "bg-amber-50",
+      iconColor: "text-amber-600",
+      border: "border-amber-200",
+    },
+    {
+      label: "متوسط عدد الحراس لكل مدرسة",
+      value: formatAverage(stats.total, stats.schools),
+      description: formatFraction(stats.total, stats.schools),
+      icon: Gauge,
+      bg: "bg-blue-50",
+      iconColor: "text-blue-600",
+      border: "border-blue-200",
+    },
+    {
+      label: "نسبة الحراس الذكور",
+      value: formatPercent(stats.male, stats.total),
+      description: formatFraction(stats.male, stats.total),
+      icon: Mars,
+      bg: "bg-indigo-50",
+      iconColor: "text-indigo-600",
+      border: "border-indigo-200",
+    },
+    {
+      label: "نسبة الحارسات الإناث",
+      value: formatPercent(stats.female, stats.total),
+      description: formatFraction(stats.female, stats.total),
+      icon: Venus,
+      bg: "bg-pink-50",
+      iconColor: "text-pink-600",
+      border: "border-pink-200",
+    },
+    {
+      label: "مؤشر الاحتياج",
+      value: hasNeedIndex ? stats.needIndex : "—",
+      description: `${stats.schoolsNoGuard.toLocaleString("ar-SA")} بدون حارس + ${stats.openNeeds.toLocaleString("ar-SA")} طلب مفتوح`,
+      badge: hasNeedIndex ? needStatus : undefined,
+      icon: AlertTriangle,
+      bg: needStatus.bg,
+      iconColor: needStatus.color,
+      border: needStatus.border,
+    },
+  ];
+
   return (
     <div className="space-y-6 pb-10">
+      <section className="overflow-hidden rounded-xl border border-primary/20 bg-card px-4 py-3 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="min-w-0">
+            <p className="text-xl font-bold leading-tight text-foreground sm:text-2xl">
+              {welcome.greeting}، {displayName} <span aria-hidden="true">{welcome.icon}</span>
+            </p>
+            <p className="mt-2 inline-flex rounded-md bg-emerald-600 px-3 py-1 text-xs font-semibold text-white dark:bg-emerald-500 dark:text-white">
+              {welcome.note}
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Page title */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
@@ -379,7 +398,7 @@ export default function Dashboard() {
       {isEmpty ? (
         <div className="bg-white rounded-2xl border border-border p-16 text-center">
           <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-            <BarChart2 className="w-8 h-8 text-muted-foreground" />
+            <Users className="w-8 h-8 text-muted-foreground" />
           </div>
           <p className="text-muted-foreground font-medium text-base">لا توجد بيانات حالياً</p>
           <p className="text-muted-foreground text-sm mt-1">
@@ -431,64 +450,10 @@ export default function Dashboard() {
             ))}
           </div>
 
-          {/* Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Guards by governorate — wide */}
-            <div className="lg:col-span-2">
-              <ChartCard
-                title="توزيع الحراس حسب المحافظة"
-                empty={chartData.guardsByGov.length === 0}
-              >
-                <HBarChart data={chartData.guardsByGov} />
-              </ChartCard>
-            </div>
-
-            {/* Gender pie */}
-            <ChartCard title="توزيع الحراس حسب الجنس" empty={chartData.guardsByGender.length === 0}>
-              <DonutChart data={chartData.guardsByGender} colorMap={PIE_COLORS.gender} />
-            </ChartCard>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Status pie */}
-            <ChartCard title="توزيع الحراس حسب الحالة" empty={chartData.guardsByStatus.length === 0}>
-              <DonutChart data={chartData.guardsByStatus} colorMap={PIE_COLORS.status} />
-            </ChartCard>
-
-            {/* Job title bar — wide */}
-            <div className="lg:col-span-2">
-              <ChartCard
-                title="توزيع الحراس حسب المسمى الوظيفي"
-                empty={chartData.guardsByJob.length === 0}
-              >
-                <HBarChart data={chartData.guardsByJob} />
-              </ChartCard>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Schools by governorate */}
-            <ChartCard
-              title="توزيع المدارس حسب المحافظة"
-              empty={chartData.schoolsByGov.length === 0}
-            >
-              <HBarChart data={chartData.schoolsByGov} color="#0f766e" />
-            </ChartCard>
-
-            {/* Schools with no guard by governorate */}
-            <ChartCard
-              title="المدارس بدون حارس حسب المحافظة"
-              empty={chartData.noGuardByGov.length === 0}
-            >
-              {chartData.noGuardByGov.length > 0 ? (
-                <HBarChart data={chartData.noGuardByGov} color="#f97316" />
-              ) : (
-                <div className="h-40 flex flex-col items-center justify-center gap-2">
-                  <ShieldCheck className="w-8 h-8 text-emerald-500 opacity-60" />
-                  <p className="text-muted-foreground text-sm">جميع المدارس لديها حراس</p>
-                </div>
-              )}
-            </ChartCard>
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {insightCards.map((s) => (
+              <StatCard key={s.label} {...s} />
+            ))}
           </div>
         </>
       )}
