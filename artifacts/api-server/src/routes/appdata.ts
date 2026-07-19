@@ -7,47 +7,75 @@ const BCRYPT_ROUNDS = 12;
 
 const router = Router();
 
-const APP_COLLECTIONS = ["guards", "schools", "needs", "tickets", "operations", "violations"] as const;
+const APP_COLLECTIONS = [
+  "guards",
+  "schools",
+  "needs",
+  "tickets",
+  "operations",
+  "violations",
+] as const;
+
 const ALL_KEYS = [...APP_COLLECTIONS, "employees", "backups"] as const;
 
 type CollectionKey = (typeof ALL_KEYS)[number];
 
+type EmployeeRecord = {
+  id: string;
+  username: string;
+  password: string;
+  status: string;
+  [key: string]: unknown;
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Neon serverless postgres auto-suspends after inactivity. The first query
- * after a cold start fails with "endpoint has been disabled" or "endpoint is
- * in state: idle". We retry up to MAX_RETRIES times with an exponential backoff
- * so callers never see a 500 caused purely by a cold-start wake-up.
+ * Neon serverless PostgreSQL may suspend after inactivity.
+ * Retry temporary wake-up and connection errors before returning a failure.
  */
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 2000;
 
 function isNeonWakeError(err: unknown): boolean {
-  const msg = err instanceof Error ? err.message : String(err);
+  const message = err instanceof Error ? err.message : String(err);
+
   return (
-    msg.includes("endpoint has been disabled") ||
-    msg.includes("The endpoint has been disabled") ||
-    msg.includes("endpoint is in state") ||
-    msg.includes("Control plane request failed") ||
-    msg.includes("ECONNRESET") ||
-    msg.includes("connection terminated unexpectedly")
+    message.includes("endpoint has been disabled") ||
+    message.includes("The endpoint has been disabled") ||
+    message.includes("endpoint is in state") ||
+    message.includes("Control plane request failed") ||
+    message.includes("ECONNRESET") ||
+    message.includes("connection terminated unexpectedly")
   );
 }
 
 async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
-  let lastErr: unknown;
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt += 1) {
     try {
       return await fn();
     } catch (err) {
-      lastErr = err;
-      if (!isNeonWakeError(err)) throw err;
-      const delay = RETRY_BASE_MS * Math.pow(2, attempt);
-      await new Promise((r) => setTimeout(r, delay));
+      lastError = err;
+
+      if (!isNeonWakeError(err)) {
+        throw err;
+      }
+
+      if (attempt < MAX_RETRIES - 1) {
+        const delay = RETRY_BASE_MS * 2 ** attempt;
+
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, delay);
+        });
+      }
     }
   }
-  throw lastErr;
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Database operation failed after retries");
 }
 
 async function getCollection(key: CollectionKey): Promise<unknown[]> {
@@ -56,60 +84,99 @@ async function getCollection(key: CollectionKey): Promise<unknown[]> {
       .select()
       .from(appDataTable)
       .where(eq(appDataTable.key, key));
-    return (rows[0]?.value as unknown[]) ?? [];
+
+    const value = rows[0]?.value;
+
+    return Array.isArray(value) ? value : [];
   });
 }
 
-async function setCollection(key: CollectionKey, value: unknown[]): Promise<void> {
-  await withRetry(() =>
-    db
+async function setCollection(
+  key: CollectionKey,
+  value: unknown[],
+): Promise<void> {
+  await withRetry(async () => {
+    await db
       .insert(appDataTable)
-      .values({ key, value })
+      .values({
+        key,
+        value,
+      })
       .onConflictDoUpdate({
         target: appDataTable.key,
-        set: { value, updatedAt: new Date() },
-      })
-  );
+        set: {
+          value,
+          updatedAt: new Date(),
+        },
+      });
+  });
 }
 
-// ─── App data (guards, schools, needs, tickets, operations, violations) ───────
+// ─── App data ─────────────────────────────────────────────────────────────────
 
-/** GET /api/appdata — return all collections in one request */
+/** GET /api/appdata — return all application collections */
 router.get("/appdata", async (req, res) => {
   try {
-    const rows = await withRetry(() =>
-      db
+    const rows = await withRetry(async () => {
+      return db
         .select()
         .from(appDataTable)
-        .where(inArray(appDataTable.key, [...APP_COLLECTIONS]))
-    );
+        .where(inArray(appDataTable.key, [...APP_COLLECTIONS]));
+    });
 
     const result: Record<string, unknown[]> = {};
-    for (const col of APP_COLLECTIONS) result[col] = [];
+
+    for (const collection of APP_COLLECTIONS) {
+      result[collection] = [];
+    }
+
     for (const row of rows) {
-      if (APP_COLLECTIONS.includes(row.key as (typeof APP_COLLECTIONS)[number])) {
-        result[row.key] = (row.value as unknown[]) ?? [];
+      const key = row.key as string;
+
+      if (
+        APP_COLLECTIONS.includes(
+          key as (typeof APP_COLLECTIONS)[number],
+        )
+      ) {
+        result[key] = Array.isArray(row.value) ? row.value : [];
       }
     }
+
     res.set("Cache-Control", "no-store");
     res.json(result);
   } catch (err) {
-    req.log.error(err, "GET /appdata failed");
-    res.status(500).json({ error: "خطأ في تحميل البيانات" });
+    req.log.error({ err }, "GET /appdata failed");
+    res.status(500).json({
+      error: "خطأ في تحميل البيانات",
+    });
   }
 });
 
-/** PUT /api/appdata — save all collections atomically */
+/** PUT /api/appdata — save all application collections */
 router.put("/appdata", async (req, res) => {
   try {
-    const body = req.body as Record<string, unknown[]>;
+    const body =
+      req.body && typeof req.body === "object"
+        ? (req.body as Record<string, unknown>)
+        : {};
+
     await Promise.all(
-      APP_COLLECTIONS.map((col) => setCollection(col, body[col] ?? []))
+      APP_COLLECTIONS.map((collection) => {
+        const value = body[collection];
+
+        return setCollection(
+          collection,
+          Array.isArray(value) ? value : [],
+        );
+      }),
     );
+
     res.json({ ok: true });
   } catch (err) {
-    req.log.error(err, "PUT /appdata failed");
-    res.status(500).json({ error: "خطأ في حفظ البيانات" });
+    req.log.error({ err }, "PUT /appdata failed");
+    res.status(500).json({
+      error: "خطأ في حفظ البيانات",
+    });
   }
 });
 
@@ -119,132 +186,235 @@ router.put("/appdata", async (req, res) => {
 router.get("/employees", async (req, res) => {
   try {
     const employees = await getCollection("employees");
+
     res.set("Cache-Control", "no-store");
     res.json(employees);
   } catch (err) {
-    req.log.error(err, "GET /employees failed");
-    res.status(500).json({ error: "خطأ في تحميل الموظفين" });
+    req.log.error({ err }, "GET /employees failed");
+    res.status(500).json({
+      error: "خطأ في تحميل الموظفين",
+    });
   }
 });
 
-/** PUT /api/employees — replace entire employees array (hashes any plain-text passwords) */
+/**
+ * PUT /api/employees
+ * Replace the employees array and hash any plain-text passwords.
+ */
 router.put("/employees", async (req, res) => {
   try {
-    const employees = req.body as Array<Record<string, unknown>>;
-    if (!Array.isArray(employees)) {
-      res.status(400).json({ error: "البيانات غير صالحة" });
+    if (!Array.isArray(req.body)) {
+      res.status(400).json({
+        error: "البيانات غير صالحة",
+      });
       return;
     }
-    const hashed = await Promise.all(
-      employees.map(async (emp) => {
-        const pw = emp["password"];
-        if (typeof pw === "string" && pw.length > 0 && !pw.startsWith("$2")) {
-          return { ...emp, password: await bcrypt.hash(pw, BCRYPT_ROUNDS) };
+
+    const employees = req.body as Array<Record<string, unknown>>;
+
+    const hashedEmployees = await Promise.all(
+      employees.map(async (employee) => {
+        const password = employee.password;
+
+        if (
+          typeof password === "string" &&
+          password.length > 0 &&
+          !password.startsWith("$2")
+        ) {
+          return {
+            ...employee,
+            password: await bcrypt.hash(password, BCRYPT_ROUNDS),
+          };
         }
-        return emp;
-      })
+
+        return employee;
+      }),
     );
-    await setCollection("employees", hashed);
+
+    await setCollection("employees", hashedEmployees);
+
     res.json({ ok: true });
   } catch (err) {
-    req.log.error(err, "PUT /employees failed");
-    res.status(500).json({ error: "خطأ في حفظ الموظفين" });
+    req.log.error({ err }, "PUT /employees failed");
+    res.status(500).json({
+      error: "خطأ في حفظ الموظفين",
+    });
   }
 });
 
-// ─── Auth ─────────────────────────────────────────────────────────────────────
+// ─── Authentication ───────────────────────────────────────────────────────────
 
-/** POST /api/auth/login — validate credentials, return employee or 401 */
+/** POST /api/auth/login — validate credentials */
 router.post("/auth/login", async (req, res) => {
-  const { username, password } = req.body as {
-    username?: string;
-    password?: string;
-  };
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
+
+  const username =
+    typeof body.username === "string" ? body.username.trim() : "";
+
+  const password =
+    typeof body.password === "string" ? body.password : "";
 
   try {
     if (!username || !password) {
-      req.log.warn({ username }, "login: missing username or password");
-      res.status(400).json({ error: "يرجى إدخال اسم المستخدم وكلمة المرور" });
+      req.log.warn(
+        { username },
+        "login: missing username or password",
+      );
+
+      res.status(400).json({
+        error: "يرجى إدخال اسم المستخدم وكلمة المرور",
+      });
       return;
     }
 
-    const trimmed = username.trim();
+    const employees =
+      (await getCollection("employees")) as EmployeeRecord[];
 
-    const employees = await getCollection("employees") as Array<{
-      id: string;
-      username: string;
-      password: string;
-      status: string;
-    }>;
+    req.log.info(
+      { employeeCount: employees.length },
+      "login: employees loaded from DB",
+    );
 
-    req.log.info({ employeeCount: employees.length }, "login: employees loaded from DB");
+    const employee = employees.find(
+      (item) => item.username === username,
+    );
 
-    // Step 1 — does the username exist at all?
-    const byUsername = employees.find((e) => e.username === trimmed);
-    if (!byUsername) {
-      req.log.warn({ username: trimmed }, "login: REJECTED — username not found");
-      res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة، أو الحساب غير نشط" });
+    if (!employee) {
+      req.log.warn(
+        { username },
+        "login: rejected — username not found",
+      );
+
+      res.status(401).json({
+        error:
+          "اسم المستخدم أو كلمة المرور غير صحيحة، أو الحساب غير نشط",
+      });
       return;
     }
 
-    // Step 2 — is the account active?
-    if (byUsername.status !== "نشط") {
-      req.log.warn({ username: trimmed, status: byUsername.status }, "login: REJECTED — account not active");
-      res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة، أو الحساب غير نشط" });
+    if (employee.status !== "نشط") {
+      req.log.warn(
+        {
+          username,
+          status: employee.status,
+        },
+        "login: rejected — account not active",
+      );
+
+      res.status(401).json({
+        error:
+          "اسم المستخدم أو كلمة المرور غير صحيحة، أو الحساب غير نشط",
+      });
       return;
     }
 
-    // Step 3 — password check
-    const passwordMatch = await bcrypt.compare(password, byUsername.password);
-    if (!passwordMatch) {
-      req.log.warn({ username: trimmed }, "login: REJECTED — wrong password");
-      res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة، أو الحساب غير نشط" });
+    if (
+      typeof employee.password !== "string" ||
+      employee.password.length === 0
+    ) {
+      req.log.error(
+        { username },
+        "login: employee password is missing or invalid",
+      );
+
+      res.status(401).json({
+        error:
+          "اسم المستخدم أو كلمة المرور غير صحيحة، أو الحساب غير نشط",
+      });
       return;
     }
 
-    req.log.info({ username: trimmed }, "login: SUCCESS");
-    const { password: _pw, ...safeUser } = byUsername;
+    const passwordMatches = await bcrypt.compare(
+      password,
+      employee.password,
+    );
+
+    if (!passwordMatches) {
+      req.log.warn(
+        { username },
+        "login: rejected — wrong password",
+      );
+
+      res.status(401).json({
+        error:
+          "اسم المستخدم أو كلمة المرور غير صحيحة، أو الحساب غير نشط",
+      });
+      return;
+    }
+
+    req.log.info({ username }, "login: success");
+
+    const { password: _password, ...safeUser } = employee;
+
     res.json(safeUser);
   } catch (err) {
     req.log.error(
-      { err, username: username?.trim() },
-      "login: DB ERROR — cannot reach database"
+      {
+        err,
+        username,
+      },
+      "login: database error",
     );
-    res.status(500).json({ error: "خطأ في تسجيل الدخول" });
+
+    res.status(500).json({
+      error: "خطأ في تسجيل الدخول",
+    });
   }
 });
 
-/** POST /api/auth/verify — confirm the calling user's password (for destructive-action dialogs) */
+/**
+ * POST /api/auth/verify
+ * Confirm the user's password before destructive actions.
+ */
 router.post("/auth/verify", async (req, res) => {
   try {
-    const { username, password } = req.body as {
-      username?: string;
-      password?: string;
-    };
+    const body =
+      req.body && typeof req.body === "object"
+        ? (req.body as Record<string, unknown>)
+        : {};
+
+    const username =
+      typeof body.username === "string"
+        ? body.username.trim()
+        : "";
+
+    const password =
+      typeof body.password === "string" ? body.password : "";
 
     if (!username || !password) {
       res.status(400).json({ ok: false });
       return;
     }
 
-    const employees = await getCollection("employees") as Array<{
-      id: string;
-      username: string;
-      password: string;
-      status: string;
-    }>;
+    const employees =
+      (await getCollection("employees")) as EmployeeRecord[];
 
-    const candidate = employees.find(
-      (e) => e.username === username.trim() && e.status === "نشط"
+    const employee = employees.find(
+      (item) =>
+        item.username === username &&
+        item.status === "نشط",
     );
 
-    const match =
-      candidate != null &&
-      (await bcrypt.compare(password, candidate.password));
+    if (
+      !employee ||
+      typeof employee.password !== "string" ||
+      employee.password.length === 0
+    ) {
+      res.json({ ok: false });
+      return;
+    }
 
-    res.json({ ok: match });
+    const matches = await bcrypt.compare(
+      password,
+      employee.password,
+    );
+
+    res.json({ ok: matches });
   } catch (err) {
-    req.log.error(err, "POST /auth/verify failed");
+    req.log.error({ err }, "POST /auth/verify failed");
     res.status(500).json({ ok: false });
   }
 });
@@ -255,27 +425,37 @@ router.post("/auth/verify", async (req, res) => {
 router.get("/backups", async (req, res) => {
   try {
     const snapshots = await getCollection("backups");
+
     res.set("Cache-Control", "no-store");
     res.json(snapshots);
   } catch (err) {
-    req.log.error(err, "GET /backups failed");
-    res.status(500).json({ error: "خطأ في تحميل النسخ الاحتياطية" });
+    req.log.error({ err }, "GET /backups failed");
+    res.status(500).json({
+      error: "خطأ في تحميل النسخ الاحتياطية",
+    });
   }
 });
 
 /** PUT /api/backups — replace all backup snapshots */
 router.put("/backups", async (req, res) => {
   try {
-    const snapshots = req.body as unknown[];
-    if (!Array.isArray(snapshots)) {
-      res.status(400).json({ error: "البيانات غير صالحة" });
+    if (!Array.isArray(req.body)) {
+      res.status(400).json({
+        error: "البيانات غير صالحة",
+      });
       return;
     }
+
+    const snapshots = req.body as unknown[];
+
     await setCollection("backups", snapshots);
+
     res.json({ ok: true });
   } catch (err) {
-    req.log.error(err, "PUT /backups failed");
-    res.status(500).json({ error: "خطأ في حفظ النسخ الاحتياطية" });
+    req.log.error({ err }, "PUT /backups failed");
+    res.status(500).json({
+      error: "خطأ في حفظ النسخ الاحتياطية",
+    });
   }
 });
 
