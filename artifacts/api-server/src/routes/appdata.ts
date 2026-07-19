@@ -1,11 +1,11 @@
-import { Router } from "express";
+import { Router, type IRouter } from "express";
 import { db, appDataTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 const BCRYPT_ROUNDS = 12;
 
-const router = Router();
+const router: IRouter = Router();
 
 const APP_COLLECTIONS = [
   "guards",
