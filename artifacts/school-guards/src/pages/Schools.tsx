@@ -5,9 +5,10 @@ import { useUsers } from "../store/useUsers";
 import {
   Search, School as SchoolIcon, FolderOpen, AlertTriangle,
   UserPlus, Briefcase, ClipboardList, X, Shield,
-  Plus, Pencil, Trash2, Lock, Eye, EyeOff,
+  Plus, Pencil, Trash2, Lock, Eye, EyeOff, Download,
 } from "lucide-react";
 import SchoolProfile from "../components/SchoolProfile";
+import { exportSchoolsWorkbook } from "../lib/schoolsExcelExport";
 import type { School, Guard, Need, NeedType, Operation } from "../types";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -672,6 +673,15 @@ export default function Schools() {
               className="pr-9 pl-4 py-2 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 w-52"
             />
           </div>
+          <button
+            onClick={() => exportSchoolsWorkbook(schools, guards)}
+            disabled={schools.length === 0}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-white text-primary border border-primary/30 hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap dark:bg-card"
+            title={`تصدير ${schools.length.toLocaleString("ar-SA")} مدرسة إلى Excel`}
+          >
+            <Download className="w-4 h-4" />
+            تصدير Excel
+          </button>
           <button
             onClick={() => setFormModal({ mode: "add" })}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-primary text-white hover:bg-primary/90 transition-colors whitespace-nowrap"
