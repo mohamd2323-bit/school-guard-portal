@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: school-guard-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile.api
+    dockerContext: .
+    healthCheckPath: /api/healthz
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: school-guard-postgres
+          property: connectionString
+
+  - type: web
+    name: school-guard-web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile.web
+    dockerContext: .
+    healthCheckPath: /
+    autoDeployTrigger: commit
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: API_UPSTREAM
+        fromService:
+          type: web
+          name: school-guard-api
+          property: hostport
+
+databases:
+  - name: school-guard-postgres
+    databaseName: school_guard
+    user: school_guard
+    plan: free
