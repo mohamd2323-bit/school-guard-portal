@@ -1,39 +1,19 @@
-import app from "./app.js";
-import { logger } from "./lib/logger.js";
+import { drizzle } from "drizzle-orm/node-postgres";
+import pg from "pg";
+import * as schema from "./schema/index.js";
 
-const rawPort = process.env["PORT"];
+const { Pool } = pg;
 
-if (!rawPort) {
+if (!process.env.DATABASE_URL) {
   throw new Error(
-    "PORT environment variable is required but was not provided.",
+    "DATABASE_URL must be set. Did you forget to provision a database?",
   );
 }
 
-const port = Number(rawPort);
-
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
-}
-
-const server = app.listen(port, (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
-    process.exit(1);
-  }
-
-  logger.info({ port }, "Server listening");
+export const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
 });
 
-function shutdown(signal: string) {
-  logger.info({ signal }, "Shutdown signal received, closing HTTP server");
+export const db = drizzle(pool, { schema });
 
-  server.close(() => {
-    logger.info("HTTP server closed");
-    process.exit(0);
-  });
-
-  setTimeout(() => process.exit(0), 5000).unref();
-}
-
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT", () => shutdown("SIGINT"));
+export * from "./schema/index.js";
