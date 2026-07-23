@@ -8,6 +8,7 @@ import {
 import { useStore } from "../store/useStore";
 import { useUsers } from "../store/useUsers";
 import type { Guard } from "../types";
+import { getRandomMotivationalMessage } from "../data/motivationalMessages";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -49,7 +50,6 @@ function getWelcomeMessage(now: Date) {
     return {
       greeting: "صباح الخير",
       icon: "🌙",
-      note: "نتمنى لك عملًا منظمًا ويومًا موفقًا",
     };
   }
 
@@ -57,7 +57,6 @@ function getWelcomeMessage(now: Date) {
     return {
       greeting: "صباح الخير",
       icon: "☀️",
-      note: "نتمنى لك عملًا منظمًا ويومًا موفقًا",
     };
   }
 
@@ -65,14 +64,12 @@ function getWelcomeMessage(now: Date) {
     return {
       greeting: "مساء الخير",
       icon: "🌤️",
-      note: "نتمنى لك عملًا منظمًا ويومًا موفقًا",
     };
   }
 
   return {
     greeting: "مساء الخير",
     icon: "🌙",
-    note: "نتمنى لك عملًا منظمًا ويومًا موفقًا",
   };
 }
 
@@ -148,6 +145,7 @@ export default function Dashboard() {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterJob, setFilterJob] = useState("");
   const [now, setNow] = useState(() => new Date());
+  const [motivationalMessage] = useState(getRandomMotivationalMessage);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
@@ -373,7 +371,7 @@ export default function Dashboard() {
               {welcome.greeting}، {displayName} <span aria-hidden="true">{welcome.icon}</span>
             </p>
             <p className="mt-2 inline-flex rounded-md bg-emerald-600 px-3 py-1 text-xs font-semibold text-white dark:bg-emerald-500 dark:text-white">
-              {welcome.note}
+              {motivationalMessage}
             </p>
           </div>
         </div>
