@@ -104,42 +104,53 @@ function ensureAdmin(employees: Employee[]): Employee[] {
 let userListeners: Array<() => void> = [];
 let sharedEmployees: Employee[] = [];
 let sharedSession: Employee | null = loadSession();
-let usersFetchStarted = false;
+let usersInitPromise: Promise<void> | null = null;
+let employeesLoadedFromServer = false;
 
 function notifyUsers() {
   userListeners.forEach((fn) => fn());
 }
 
-async function initEmployees() {
-  if (usersFetchStarted) return;
-  usersFetchStarted = true;
-  try {
-    let employees = await fetchEmployees();
-    // First run: seed default admin if list is empty
-    if (employees.length === 0) {
-      employees = [DEFAULT_ADMIN];
-      await persistEmployees(employees);
-    } else {
-      employees = ensureAdmin(employees);
-    }
-    sharedEmployees = employees;
-    // Keep session user in sync with server data
-    if (sharedSession) {
-      const fresh = sharedEmployees.find((e) => e.id === sharedSession!.id);
-      if (!fresh || fresh.status !== "نشط") {
-        sharedSession = null;
-        saveSession(null);
+function initEmployees(): Promise<void> {
+  if (usersInitPromise) return usersInitPromise;
+
+  usersInitPromise = (async () => {
+    try {
+      let employees = await fetchEmployees();
+      employeesLoadedFromServer = true;
+
+      // First run: seed default admin if list is empty
+      if (employees.length === 0) {
+        employees = [DEFAULT_ADMIN];
+        await persistEmployees(employees);
       } else {
-        sharedSession = fresh;
-        saveSession(fresh);
+        employees = ensureAdmin(employees);
       }
+      sharedEmployees = employees;
+
+      // Keep session user in sync with server data
+      if (sharedSession) {
+        const fresh = sharedEmployees.find((e) => e.id === sharedSession!.id);
+        if (!fresh || fresh.status !== "نشط") {
+          sharedSession = null;
+          saveSession(null);
+        } else {
+          sharedSession = fresh;
+          saveSession(fresh);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load employees:", err);
+      employeesLoadedFromServer = false;
+      // Allow the next attempt to retry the server instead of trusting fallback data.
+      usersInitPromise = null;
+      sharedEmployees = [DEFAULT_ADMIN];
     }
-  } catch (err) {
-    console.error("Failed to load employees:", err);
-    // Fallback: show default admin so login still works
-    sharedEmployees = [DEFAULT_ADMIN];
-  }
-  notifyUsers();
+
+    notifyUsers();
+  })();
+
+  return usersInitPromise;
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
@@ -202,6 +213,9 @@ export function useUsers() {
 
   const login = useCallback(async (username: string, password: string): Promise<Employee | null> => {
     try {
+      // Wait for the authoritative server list before any code can persist it.
+      await initEmployees();
+
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -210,12 +224,15 @@ export function useUsers() {
       if (!res.ok) return null;
       const user = await res.json() as Employee;
 
-      // Update lastLogin in the server list
+      // Update lastLogin only when the employee list came from the server.
+      // Never replace the database with fallback [DEFAULT_ADMIN] after a cold start.
       const now = new Date().toISOString();
-      sharedEmployees = ensureAdmin(
-        sharedEmployees.map((e) => (e.id === user.id ? { ...e, lastLogin: now } : e))
-      );
-      persistEmployees(sharedEmployees).catch(console.error);
+      if (employeesLoadedFromServer) {
+        sharedEmployees = ensureAdmin(
+          sharedEmployees.map((e) => (e.id === user.id ? { ...e, lastLogin: now } : e))
+        );
+        persistEmployees(sharedEmployees).catch(console.error);
+      }
 
       const updated = { ...user, lastLogin: now };
       sharedSession = updated;
