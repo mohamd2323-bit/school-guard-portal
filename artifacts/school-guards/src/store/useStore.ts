@@ -400,6 +400,19 @@ export function useStore() {
     [setData]
   );
 
+  const removeInvalidImportedTickets = useCallback(() => {
+    setData({
+      ...sharedData,
+      tickets: sharedData.tickets.filter((ticket) => {
+        if (ticket.source !== "منصة الدعم الموحد") return true;
+        const randomImportNumber = /^BLG-[A-Z0-9]{6}$/i.test(ticket.ticketNumber);
+        const invalidDate = ticket.ticketDate === "Invalid Date" || Number.isNaN(new Date(ticket.ticketDate).getTime());
+        const missingSchool = ticket.schoolName === "غير محدد";
+        return !(randomImportNumber || (invalidDate && missingSchool));
+      }),
+    });
+  }, [setData]);
+
   const updateTicket = useCallback(
     (id: string, patch: Partial<Ticket>) =>
       setData({ ...sharedData, tickets: sharedData.tickets.map((t) => (t.id === id ? { ...t, ...patch } : t)) }),
@@ -602,6 +615,7 @@ export function useStore() {
     deleteNeed,
     addTicket,
     upsertTickets,
+    removeInvalidImportedTickets,
     updateTicket,
     deleteTicket,
     addOperation,

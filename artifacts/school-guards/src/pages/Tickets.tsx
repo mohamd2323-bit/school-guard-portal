@@ -13,6 +13,7 @@ import {
   X,
   ChevronDown,
   Trash2,
+  Sparkles,
   Calendar,
   Eye,
   Building2,
@@ -577,7 +578,7 @@ function StatusBadge({ status, onChange }: { status: TicketStatus; onChange: (s:
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Tickets() {
-  const { schools, tickets, addTicket, upsertTickets, updateTicket, deleteTicket } = useStore();
+  const { schools, tickets, addTicket, upsertTickets, removeInvalidImportedTickets, updateTicket, deleteTicket } = useStore();
   const [showAdd, setShowAdd] = useState(false);
   const [selected, setSelected] = useState<Ticket | null>(null);
   const [search, setSearch] = useState("");
@@ -644,6 +645,17 @@ export default function Tickets() {
     };
   }, [tickets]);
 
+  const invalidImportedCount = useMemo(
+    () =>
+      tickets.filter((ticket) => {
+        if (ticket.source !== "منصة الدعم الموحد") return false;
+        const randomImportNumber = /^BLG-[A-Z0-9]{6}$/i.test(ticket.ticketNumber);
+        const invalidDate = ticket.ticketDate === "Invalid Date" || Number.isNaN(new Date(ticket.ticketDate).getTime());
+        return randomImportNumber || (invalidDate && ticket.schoolName === "غير محدد");
+      }).length,
+    [tickets],
+  );
+
   function formatDate(d: string) {
     if (!d) return "—";
     try { return new Date(d).toLocaleDateString("ar-SA", { year: "numeric", month: "short", day: "numeric" }); }
@@ -698,6 +710,16 @@ export default function Tickets() {
           <p className="text-muted-foreground text-sm mt-0.5">متابعة وإدارة بلاغات الدعم للمدارس</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {invalidImportedCount > 0 && (
+            <button onClick={() => {
+              removeInvalidImportedTickets();
+              setSyncMessage(`تم تنظيف ${invalidImportedCount.toLocaleString("ar-SA")} بلاغ مستورد غير صالح.`);
+            }}
+              className="flex items-center gap-2 bg-red-50 text-red-700 border border-red-200 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-red-100 transition-colors shadow-sm">
+              <Sparkles className="w-4 h-4" />
+              تنظيف الوهمية
+            </button>
+          )}
           <input
             ref={fileInputRef}
             type="file"

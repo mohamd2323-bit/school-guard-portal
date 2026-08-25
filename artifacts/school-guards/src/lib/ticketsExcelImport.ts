@@ -12,7 +12,12 @@ function genId() {
 }
 
 function normalizeKey(value: string) {
-  return value.replace(/\s+/g, "").replace(/[ـ_:：]/g, "").trim();
+  return value
+    .replace(/^\uFEFF/, "")
+    .replace(/^["']|["']$/g, "")
+    .replace(/\s+/g, "")
+    .replace(/[ـ_:：]/g, "")
+    .trim();
 }
 
 function getValue(row: ImportRow, labels: string[]) {
@@ -80,6 +85,12 @@ function rowsFromSingleColumnCsv(sheet: XLSX.WorkSheet): ImportRow[] {
 
 function normalizeDate(value: string) {
   if (!value) return new Date().toISOString().split("T")[0];
+  const isoLike = value.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+  if (isoLike) {
+    const [, year, month, day] = isoLike;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
   const date = new Date(value);
   if (!Number.isNaN(date.getTime())) return date.toISOString().split("T")[0];
 
@@ -141,7 +152,9 @@ function makeTicket(row: ImportRow, schools: School[]): Ticket | null {
   const problem = getValue(row, ["المشكلة", "العنوان", "ملخص", "Title", "Summary", "Subject"]);
   const schoolName = getValue(row, ["المدرسة", "اسم المدرسة", "School", "School Name"]);
 
-  if (!ticketNumber && !description && !problem && !schoolName) return null;
+  const externalId = ticketNumber || requestNumber;
+  if (!externalId) return null;
+  if (!description && !problem && !schoolName) return null;
 
   const school = findSchool(schools, schoolName);
   const ticketType = normalizeType(getValue(row, ["نوع البلاغ", "النوع", "Type", "Category"]));
@@ -158,9 +171,9 @@ function makeTicket(row: ImportRow, schools: School[]): Ticket | null {
   ]));
 
   return {
-    id: `imported-${ticketNumber || genId()}`,
-    ticketNumber: ticketNumber || `BLG-${genId().slice(0, 6).toUpperCase()}`,
-    externalId: ticketNumber || requestNumber || undefined,
+    id: `imported-${externalId || genId()}`,
+    ticketNumber: externalId,
+    externalId,
     source: "منصة الدعم الموحد",
     reporterName: getValue(row, ["مقدم البلاغ", "طالب الخدمة", "Requester", "Requested By", "Submitter"]),
     schoolId: school?.id ?? null,
