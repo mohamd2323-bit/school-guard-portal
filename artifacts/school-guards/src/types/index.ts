@@ -49,6 +49,7 @@ export interface Need {
 }
 
 export type TicketStatus = "جديد" | "تحت الإجراء" | "مغلق";
+export type TicketPriority = "منخفض" | "متوسط" | "عالي" | "حرج";
 export type TicketType =
   | "شكوى"
   | "طلب صيانة"
@@ -60,16 +61,24 @@ export type TicketType =
 export interface Ticket {
   id: string;
   ticketNumber: string;
+  externalId?: string;
+  source?: "البوابة" | "منصة الدعم الموحد";
+  reporterName?: string;
   schoolId: string | null;
   schoolName: string;
   governorate: string;
   principalName: string;
   principalPhone: string;
   ticketType: TicketType;
+  problem?: string;
   description: string;
   status: TicketStatus;
+  priority?: TicketPriority;
   ticketDate: string;
+  resolvedAt?: string;
   actions: string;
+  assignedTo?: string;
+  lastSyncedAt?: string;
   createdAt: string;
 }
 

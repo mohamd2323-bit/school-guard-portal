@@ -384,6 +384,22 @@ export function useStore() {
     [setData]
   );
 
+  const upsertTickets = useCallback(
+    (tickets: Ticket[]) => {
+      const byKey = new Map<string, Ticket>();
+      sharedData.tickets.forEach((ticket) => {
+        byKey.set(ticket.externalId || ticket.ticketNumber || ticket.id, ticket);
+      });
+      tickets.forEach((ticket) => {
+        const key = ticket.externalId || ticket.ticketNumber || ticket.id;
+        const existing = byKey.get(key);
+        byKey.set(key, existing ? { ...existing, ...ticket, id: existing.id } : ticket);
+      });
+      setData({ ...sharedData, tickets: Array.from(byKey.values()) });
+    },
+    [setData]
+  );
+
   const updateTicket = useCallback(
     (id: string, patch: Partial<Ticket>) =>
       setData({ ...sharedData, tickets: sharedData.tickets.map((t) => (t.id === id ? { ...t, ...patch } : t)) }),
@@ -585,6 +601,7 @@ export function useStore() {
     updateNeedStatus,
     deleteNeed,
     addTicket,
+    upsertTickets,
     updateTicket,
     deleteTicket,
     addOperation,
