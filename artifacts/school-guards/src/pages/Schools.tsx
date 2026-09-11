@@ -28,6 +28,32 @@ function unique(values: (string | undefined | null)[]): string[] {
   );
 }
 
+function governorateKey(value: string | undefined | null) {
+  return (value ?? "")
+    .trim()
+    .replace(/[\u064B-\u065F\u0670]/g, "")
+    .replace(/[إأآٱ]/g, "ا")
+    .replace(/\s+/g, " ");
+}
+
+function displayGovernorate(value: string | undefined | null) {
+  const key = governorateKey(value);
+  if (key === "ابها") return "أبها";
+  return (value ?? "").trim();
+}
+
+function uniqueGovernorates(values: (string | undefined | null)[]): string[] {
+  const byKey = new Map<string, string>();
+
+  values.forEach((value) => {
+    const key = governorateKey(value);
+    if (!key) return;
+    byKey.set(key, displayGovernorate(value));
+  });
+
+  return Array.from(byKey.values()).sort((a, b) => a.localeCompare(b, "ar"));
+}
+
 function makeOp(
   type: Operation["type"],
   guardId: string | null,
@@ -61,7 +87,7 @@ function initSchoolsState(): SchoolsPersistedState {
     return {
       search: p.get("q") ?? "",
       guardFilter: v === "no-guard" || v === "has-guard" ? v : "all",
-      governorateFilter: p.get("governorate") ?? "",
+      governorateFilter: displayGovernorate(p.get("governorate")),
       typeFilter: type === "بنين" || type === "بنات" || type === "مختلط" ? type : "",
     };
   }
@@ -73,7 +99,7 @@ function initSchoolsState(): SchoolsPersistedState {
         return {
           search: stored.search ?? "",
           guardFilter: stored.guardFilter,
-          governorateFilter: stored.governorateFilter ?? "",
+          governorateFilter: displayGovernorate(stored.governorateFilter),
           typeFilter: stored.typeFilter ?? "",
         };
       }
@@ -647,7 +673,7 @@ export default function Schools() {
   );
 
   const filterOptions = useMemo(() => ({
-    governorates: unique(schools.map((school) => school.governorate)),
+    governorates: uniqueGovernorates(schools.map((school) => school.governorate)),
     types: unique(schools.map((school) => school.type)),
   }), [schools]);
 
@@ -658,7 +684,7 @@ export default function Schools() {
         guardFilter === "all" ||
         (guardFilter === "no-guard" && !hasGuard) ||
         (guardFilter === "has-guard" && hasGuard);
-      const matchesGovernorate = !governorateFilter || s.governorate.trim() === governorateFilter;
+      const matchesGovernorate = !governorateFilter || governorateKey(s.governorate) === governorateKey(governorateFilter);
       const matchesType = !typeFilter || s.type.trim() === typeFilter;
       const q = search.trim();
       const matchesSearch = !q ||
