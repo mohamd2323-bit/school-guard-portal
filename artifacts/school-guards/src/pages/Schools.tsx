@@ -5,7 +5,7 @@ import { useUsers } from "../store/useUsers";
 import {
   Search, School as SchoolIcon, FolderOpen, AlertTriangle,
   UserPlus, Briefcase, ClipboardList, X, Shield,
-  Plus, Pencil, Trash2, Lock, Eye, EyeOff, Download,
+  Plus, Pencil, Trash2, Lock, Eye, EyeOff, Download, ChevronDown,
 } from "lucide-react";
 import SchoolProfile from "../components/SchoolProfile";
 import { exportSchoolsWorkbook } from "../lib/schoolsExcelExport";
@@ -20,6 +20,12 @@ function genId() {
 
 function todayStr() {
   return new Date().toISOString().split("T")[0];
+}
+
+function unique(values: (string | undefined | null)[]): string[] {
+  return Array.from(new Set(values.map((value) => value?.trim()).filter(Boolean) as string[])).sort((a, b) =>
+    a.localeCompare(b, "ar")
+  );
 }
 
 function makeOp(
@@ -42,26 +48,81 @@ const SCHOOLS_STORAGE_KEY = "schoolsFilters";
 interface SchoolsPersistedState {
   search: string;
   guardFilter: GuardFilter;
+  governorateFilter: string;
+  typeFilter: string;
 }
 
 function initSchoolsState(): SchoolsPersistedState {
   const p = new URLSearchParams(window.location.search);
-  const hasUrlFilters = p.get("guard") || p.get("q");
+  const hasUrlFilters = p.get("guard") || p.get("q") || p.get("governorate") || p.get("type");
   if (hasUrlFilters) {
     const v = p.get("guard");
+    const type = p.get("type") ?? "";
     return {
       search: p.get("q") ?? "",
       guardFilter: v === "no-guard" || v === "has-guard" ? v : "all",
+      governorateFilter: p.get("governorate") ?? "",
+      typeFilter: type === "بنين" || type === "بنات" || type === "مختلط" ? type : "",
     };
   }
   try {
     const raw = sessionStorage.getItem(SCHOOLS_STORAGE_KEY);
     if (raw) {
       const stored = JSON.parse(raw) as SchoolsPersistedState;
-      if (stored && typeof stored.guardFilter === "string") return stored;
+      if (stored && typeof stored.guardFilter === "string") {
+        return {
+          search: stored.search ?? "",
+          guardFilter: stored.guardFilter,
+          governorateFilter: stored.governorateFilter ?? "",
+          typeFilter: stored.typeFilter ?? "",
+        };
+      }
     }
   } catch {}
-  return { search: "", guardFilter: "all" };
+  return { search: "", guardFilter: "all", governorateFilter: "", typeFilter: "" };
+}
+
+function SchoolFilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) {
+  const active = value !== "";
+
+  return (
+    <div className="relative min-w-[10rem]">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`w-full appearance-none rounded-lg border bg-white py-2 pr-3 pl-8 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30 dark:bg-card
+          ${active ? "border-primary font-semibold text-primary" : "border-border text-foreground"}`}
+        title={label}
+      >
+        <option value="">{label}: الكل</option>
+        {options.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+      {active ? (
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          className="absolute left-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-primary hover:bg-primary/10"
+          aria-label={`مسح فلتر ${label}`}
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      ) : (
+        <ChevronDown className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+      )}
+    </div>
+  );
 }
 
 // ─── Guard picker (inline) ────────────────────────────────────────────────────
@@ -534,21 +595,25 @@ export default function Schools() {
   const initialState = useMemo(initSchoolsState, []);
   const [search, setSearch] = useState(initialState.search);
   const [guardFilter, setGuardFilter] = useState<GuardFilter>(initialState.guardFilter);
+  const [governorateFilter, setGovernorateFilter] = useState(initialState.governorateFilter);
+  const [typeFilter, setTypeFilter] = useState(initialState.typeFilter);
   const tableScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const state: SchoolsPersistedState = { search, guardFilter };
+    const state: SchoolsPersistedState = { search, guardFilter, governorateFilter, typeFilter };
     try { sessionStorage.setItem(SCHOOLS_STORAGE_KEY, JSON.stringify(state)); } catch {}
     const p = new URLSearchParams();
     if (search) p.set("q", search);
     if (guardFilter !== "all") p.set("guard", guardFilter);
+    if (governorateFilter) p.set("governorate", governorateFilter);
+    if (typeFilter) p.set("type", typeFilter);
     const qs = p.toString();
     navigate("/schools" + (qs ? "?" + qs : ""), { replace: true });
-  }, [guardFilter, search, navigate]);
+  }, [guardFilter, governorateFilter, search, typeFilter, navigate]);
 
   useEffect(() => {
     if (tableScrollRef.current) tableScrollRef.current.scrollTop = 0;
-  }, [guardFilter, search]);
+  }, [governorateFilter, guardFilter, search, typeFilter]);
 
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [actionModal, setActionModal] = useState<ActionModal | null>(null);
@@ -575,6 +640,11 @@ export default function Schools() {
     [schools, guardCountMap]
   );
 
+  const filterOptions = useMemo(() => ({
+    governorates: unique(schools.map((school) => school.governorate)),
+    types: unique(schools.map((school) => school.type)),
+  }), [schools]);
+
   const filtered = useMemo(() => {
     return schools.filter((s) => {
       const hasGuard = guardCountMap.has(s.id);
@@ -582,6 +652,8 @@ export default function Schools() {
         guardFilter === "all" ||
         (guardFilter === "no-guard" && !hasGuard) ||
         (guardFilter === "has-guard" && hasGuard);
+      const matchesGovernorate = !governorateFilter || s.governorate.trim() === governorateFilter;
+      const matchesType = !typeFilter || s.type.trim() === typeFilter;
       const q = search.trim();
       const matchesSearch = !q ||
         s.name.includes(q) ||
@@ -589,9 +661,9 @@ export default function Schools() {
         s.level.includes(q) ||
         s.principalName.includes(q) ||
         s.principalNationalId.includes(q);
-      return matchesFilter && matchesSearch;
+      return matchesFilter && matchesGovernorate && matchesType && matchesSearch;
     });
-  }, [schools, guardCountMap, guardFilter, search]);
+  }, [schools, guardCountMap, governorateFilter, guardFilter, search, typeFilter]);
 
   const FILTER_TABS: { key: GuardFilter; label: string }[] = [
     { key: "all", label: `جميع المدارس (${schools.length})` },
@@ -666,6 +738,22 @@ export default function Schools() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {schools.length > 0 && (
+            <>
+              <SchoolFilterSelect
+                label="المحافظة"
+                value={governorateFilter}
+                options={filterOptions.governorates}
+                onChange={setGovernorateFilter}
+              />
+              <SchoolFilterSelect
+                label="النوع"
+                value={typeFilter}
+                options={filterOptions.types.length ? filterOptions.types : SCHOOL_TYPES}
+                onChange={setTypeFilter}
+              />
+            </>
+          )}
           <div className="relative">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
