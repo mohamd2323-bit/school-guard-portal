@@ -652,12 +652,18 @@ export default function Schools() {
 
   const schoolUserCountMap = useMemo(() => {
     const counts = new Map<string, number>();
+    const eligibleSchoolIds = new Set(
+      schools
+        .filter((school) => school.type === "بنات" || school.type === "مختلط")
+        .map((school) => school.id)
+    );
     guards.forEach((guard) => {
       if (!guard.schoolId || guard.gender === "ذكر") return;
+      if (!eligibleSchoolIds.has(guard.schoolId)) return;
       counts.set(guard.schoolId, (counts.get(guard.schoolId) ?? 0) + 1);
     });
     return counts;
-  }, [guards]);
+  }, [guards, schools]);
 
   const schoolUserCount = useMemo(
     () => Array.from(schoolUserCountMap.values()).reduce((total, count) => total + count, 0),
@@ -874,7 +880,8 @@ export default function Schools() {
               <tbody>
                 {filtered.map((school) => {
                   const count = guardCountMap.get(school.id) ?? 0;
-                  const userCount = schoolUserCountMap.get(school.id) ?? 0;
+                  const canHaveSchoolUsers = school.type === "بنات" || school.type === "مختلط";
+                  const userCount = canHaveSchoolUsers ? schoolUserCountMap.get(school.id) ?? 0 : 0;
                   const noGuard = count === 0;
                   return (
                     <tr
@@ -925,7 +932,7 @@ export default function Schools() {
                               : "bg-muted text-muted-foreground"
                             }`}>
                             <Users className="w-3 h-3" />
-                            {userCount}
+                            {canHaveSchoolUsers ? userCount : "—"}
                           </span>
                         </div>
                       </td>
