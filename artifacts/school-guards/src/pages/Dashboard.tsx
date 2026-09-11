@@ -9,6 +9,7 @@ import { useStore } from "../store/useStore";
 import { useUsers } from "../store/useUsers";
 import type { Guard } from "../types";
 import { getRandomMotivationalMessage } from "../data/motivationalMessages";
+import { buildMaleGuardsBySchool } from "../lib/guardCoverage";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -195,7 +196,7 @@ export default function Dashboard() {
 
   // Stat computations
   const stats = useMemo(() => {
-    const assignedSchoolIds = new Set(filteredGuards.map((g) => g.schoolId).filter(Boolean));
+    const assignedSchoolIds = new Set(buildMaleGuardsBySchool(filteredGuards).keys());
     const linkedSchools = filteredSchools.filter((s) => assignedSchoolIds.has(s.id)).length;
     const schoolsNoGuard = filteredSchools.filter((s) => !assignedSchoolIds.has(s.id)).length;
     const openNeeds = filteredNeeds.filter((n) => n.status === "جديد" || n.status === "تحت الإجراء").length;

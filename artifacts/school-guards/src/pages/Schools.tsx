@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import SchoolProfile from "../components/SchoolProfile";
 import { exportSchoolsWorkbook } from "../lib/schoolsExcelExport";
+import { buildMaleGuardsBySchool } from "../lib/guardCoverage";
 import type { School, Guard, Need, NeedType, Operation } from "../types";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -559,13 +560,15 @@ export default function Schools() {
   const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [unauthorizedMsg, setUnauthorizedMsg] = useState<string | null>(null);
 
-  const guardCountMap = useMemo(() => {
-    const map = new Map<string, number>();
-    guards.forEach((g) => {
-      if (g.schoolId) map.set(g.schoolId, (map.get(g.schoolId) ?? 0) + 1);
-    });
-    return map;
-  }, [guards]);
+  const guardCountMap = useMemo(() =>
+    new Map(
+      Array.from(buildMaleGuardsBySchool(guards).entries(), ([schoolId, schoolGuards]) => [
+        schoolId,
+        schoolGuards.length,
+      ])
+    ),
+    [guards]
+  );
 
   const noGuardCount = useMemo(() =>
     schools.filter((s) => !guardCountMap.has(s.id)).length,

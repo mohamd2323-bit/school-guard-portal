@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import type { Guard, School } from "../types";
+import { buildMaleGuardsBySchool } from "./guardCoverage";
 
 type CellValue = string | number;
 type Row = CellValue[];
@@ -157,7 +158,7 @@ function buildGuardRows(schools: School[], guards: Guard[]) {
 }
 
 function buildSchoolRows(schools: School[], guards: Guard[]) {
-  const guardsBySchool = buildGuardsBySchool(guards);
+  const guardsBySchool = buildMaleGuardsBySchool(guards);
 
   return schools.map((school) => {
     const schoolRecord = asRecord(school);
@@ -192,7 +193,7 @@ export function buildSchoolsWorkbook(schools: School[], guards: Guard[]) {
     guardRows,
     summaryHeaders: SCHOOL_HEADERS,
     guardHeaders: GUARD_HEADERS,
-    maxGuards: Math.max(0, ...Array.from(buildGuardsBySchool(guards).values(), (list) => list.length)),
+    maxGuards: Math.max(0, ...Array.from(buildMaleGuardsBySchool(guards).values(), (list) => list.length)),
   };
 }
 
