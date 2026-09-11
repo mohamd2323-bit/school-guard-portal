@@ -42,7 +42,7 @@ function makeOp(
 }
 
 function googleMapsSchoolUrl(school: School) {
-  const query = [school.name, displayGovernorate(school.governorate), "السعودية"]
+  const query = [school.name, "مدارس قريبة", displayGovernorate(school.governorate), "منطقة عسير"]
     .filter(Boolean)
     .join(" ");
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
