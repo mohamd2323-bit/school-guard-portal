@@ -87,11 +87,13 @@ function SchoolFilterSelect({
   value,
   options,
   onChange,
+  compact = false,
 }: {
   label: string;
   value: string;
   options: Array<string | { value: string; label: string }>;
   onChange: (value: string) => void;
+  compact?: boolean;
 }) {
   const active = value !== "";
   const optionItems = options.map((option) =>
@@ -99,12 +101,13 @@ function SchoolFilterSelect({
   );
 
   return (
-    <div className="relative min-w-[10rem]">
+    <div className={`relative ${compact ? "mx-auto min-w-[7rem] max-w-[10rem]" : "min-w-[10rem]"}`}>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`w-full appearance-none rounded-lg border bg-white py-2 pr-3 pl-8 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30 dark:bg-card
-          ${active ? "border-primary font-semibold text-primary" : "border-border text-foreground"}`}
+        className={`w-full appearance-none rounded-lg border py-2 pr-3 pl-8 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30
+          ${compact ? "bg-transparent text-xs" : "bg-white text-sm dark:bg-card"}
+          ${active ? "border-primary bg-white font-semibold text-primary dark:bg-card" : compact ? "border-transparent text-foreground hover:border-primary/30 hover:bg-white" : "border-border text-foreground"}`}
         title={label}
       >
         <option value="">{label}: الكل</option>
@@ -785,30 +788,6 @@ export default function Schools() {
         </div>
       )}
 
-      {/* Filters */}
-      {schools.length > 0 && (
-        <div className="flex flex-wrap items-end gap-3">
-          <SchoolFilterSelect
-            label="الحالة"
-            value={guardFilter === "all" ? "" : guardFilter}
-            options={statusOptions}
-            onChange={(value) => setGuardFilter((value || "all") as GuardFilter)}
-          />
-          <SchoolFilterSelect
-            label="المحافظة"
-            value={governorateFilter}
-            options={filterOptions.governorates}
-            onChange={setGovernorateFilter}
-          />
-          <SchoolFilterSelect
-            label="النوع"
-            value={typeFilter}
-            options={filterOptions.types.length ? filterOptions.types : SCHOOL_TYPES}
-            onChange={setTypeFilter}
-          />
-        </div>
-      )}
-
       {/* Table */}
       <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-white shadow-sm dark:bg-card">
         {schools.length === 0 ? (
@@ -832,14 +811,38 @@ export default function Schools() {
               <thead className="sticky top-0 z-10">
                 <tr>
                   <th>اسم المدرسة</th>
-                  <th>المحافظة</th>
+                  <th>
+                    <SchoolFilterSelect
+                      label="المحافظة"
+                      value={governorateFilter}
+                      options={filterOptions.governorates}
+                      onChange={setGovernorateFilter}
+                      compact
+                    />
+                  </th>
                   <th>المرحلة</th>
-                  <th>النوع</th>
+                  <th>
+                    <SchoolFilterSelect
+                      label="النوع"
+                      value={typeFilter}
+                      options={filterOptions.types.length ? filterOptions.types : SCHOOL_TYPES}
+                      onChange={setTypeFilter}
+                      compact
+                    />
+                  </th>
                   <th>اسم المدير/ة</th>
                   <th>سجل المدير/ة</th>
                   <th>جوال المدير/ة</th>
                   <th>عدد الحراس</th>
-                  <th>الحالة</th>
+                  <th>
+                    <SchoolFilterSelect
+                      label="الحالة"
+                      value={guardFilter === "all" ? "" : guardFilter}
+                      options={statusOptions}
+                      onChange={(value) => setGuardFilter((value || "all") as GuardFilter)}
+                      compact
+                    />
+                  </th>
                   <th>الإجراءات</th>
                 </tr>
               </thead>
