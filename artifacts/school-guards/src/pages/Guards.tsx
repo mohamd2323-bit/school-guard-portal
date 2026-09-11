@@ -817,6 +817,18 @@ export default function Guards() {
   function handleEditSave(patch: Partial<Guard>) {
     if (!editTarget || !currentUser) return;
     const now = new Date().toISOString();
+    const schoolChanged = patch.schoolId !== editTarget.schoolId;
+    const details: Record<string, string> = {
+      nationalId: editTarget.nationalId,
+      performedBy: currentUser.username,
+    };
+    if (schoolChanged) {
+      details.fromSchoolName = editTarget.schoolName || "بدون مدرسة";
+      details.fromSchoolId = editTarget.schoolId || "";
+      details.toSchoolName = patch.schoolName || "بدون مدرسة";
+      details.toSchoolId = patch.schoolId || "";
+      details.reason = "تعديل بيانات الحارس";
+    }
     const op: Operation = {
       id: genId(),
       type: "تعديل بيانات",
@@ -825,10 +837,7 @@ export default function Guards() {
       date: now.split("T")[0],
       notes: "",
       createdAt: now,
-      details: {
-        nationalId: editTarget.nationalId,
-        performedBy: currentUser.username,
-      },
+      details,
       performedBy: currentUser.username,
     };
     updateGuard(editTarget.id, patch, op);

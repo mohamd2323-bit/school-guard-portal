@@ -466,6 +466,8 @@ export function useStore() {
           reason,
           cancelledBy,
           endDate,
+          returnSchoolName: guard?.previousSchoolName ?? guard?.schoolName ?? "",
+          returnSchoolId: guard?.previousSchoolId ?? guard?.schoolId ?? "",
         },
         performedBy: cancelledBy,
         assignmentStatus: "منتهي",

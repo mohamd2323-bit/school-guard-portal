@@ -88,12 +88,93 @@ function opSummary(op: Operation): string {
   }
 }
 
+interface MovementHistoryItem {
+  id: string;
+  type: OperationType;
+  date: string;
+  fromSchool: string;
+  toSchool: string;
+  reason: string;
+  notes: string;
+}
+
+function buildMovementHistory(ops: Operation[]): MovementHistoryItem[] {
+  return ops
+    .map((op): MovementHistoryItem | null => {
+      const d = op.details;
+      if (op.type === "نقل حارس") {
+        return {
+          id: op.id,
+          type: op.type,
+          date: op.date,
+          fromSchool: d.fromSchoolName || "بدون مدرسة",
+          toSchool: d.toSchoolName || "غير محدد",
+          reason: d.reason || op.notes || "غير محدد",
+          notes: op.notes,
+        };
+      }
+
+      if (op.type === "تكليف حارس") {
+        return {
+          id: op.id,
+          type: op.type,
+          date: d.startDate || op.date,
+          fromSchool: d.currentSchool || "المدرسة الحالية",
+          toSchool: d.entity || "غير محدد",
+          reason: d.reason || op.notes || "غير محدد",
+          notes: op.notes,
+        };
+      }
+
+      if (op.type === "إنهاء تكليف") {
+        return {
+          id: op.id,
+          type: op.type,
+          date: d.endDate || op.date,
+          fromSchool: d.entity || "جهة التكليف",
+          toSchool: d.returnSchoolName || "المدرسة السابقة",
+          reason: d.reason || op.notes || "غير محدد",
+          notes: op.notes,
+        };
+      }
+
+      if (op.type === "إضافة حارس" && d.schoolName) {
+        return {
+          id: op.id,
+          type: op.type,
+          date: op.date,
+          fromSchool: "—",
+          toSchool: d.schoolName,
+          reason: d.reason || op.notes || "إضافة أولية",
+          notes: op.notes,
+        };
+      }
+
+      if (op.type === "تعديل بيانات" && (d.fromSchoolName || d.toSchoolName)) {
+        return {
+          id: op.id,
+          type: op.type,
+          date: op.date,
+          fromSchool: d.fromSchoolName || "غير محدد",
+          toSchool: d.toSchoolName || "غير محدد",
+          reason: d.reason || d.summary || op.notes || "تعديل المدرسة",
+          notes: op.notes,
+        };
+      }
+
+      return null;
+    })
+    .filter((item): item is MovementHistoryItem => item !== null);
+}
+
 export default function GuardProfile({ guard, school, onClose }: Props) {
   const { operations, violations } = useStore();
 
   const guardOps = operations
     .filter((op) => op.guardId === guard.id)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const movementHistory = buildMovementHistory(guardOps);
 
   const guardViolations = violations
     .filter((v) => v.guardId === guard.id)
@@ -186,6 +267,53 @@ export default function GuardProfile({ guard, school, onClose }: Props) {
               </div>
             ) : (
               <div className="bg-muted/40 rounded-xl px-4 py-3 text-center text-muted-foreground text-sm">لا توجد مدرسة مرتبطة</div>
+            )}
+          </section>
+
+          {/* Movement history */}
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <ArrowLeftRight className="w-4 h-4 text-indigo-600" />
+              <h3 className="font-bold text-sm text-foreground">سجل التنقلات المدرسية</h3>
+              {movementHistory.length > 0 && (
+                <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">{movementHistory.length}</span>
+              )}
+            </div>
+            {movementHistory.length === 0 ? (
+              <div className="bg-muted/40 rounded-xl px-4 py-4 text-center text-muted-foreground text-sm">
+                لا توجد تنقلات مدرسية مسجلة
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {movementHistory.map((item) => (
+                  <div key={item.id} className="bg-indigo-50/70 border border-indigo-100 rounded-xl px-4 py-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${OP_COLORS[item.type]}`}>
+                        {OP_ICONS[item.type]}
+                        {item.type}
+                      </span>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">{formatDate(item.date)}</span>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2 mt-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-0.5">من</p>
+                        <p className="text-sm font-semibold text-foreground">{item.fromSchool}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-0.5">إلى</p>
+                        <p className="text-sm font-semibold text-foreground">{item.toSchool}</p>
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <p className="text-xs text-muted-foreground mb-0.5">السبب</p>
+                      <p className="text-sm text-foreground">{item.reason}</p>
+                    </div>
+                    {item.notes && item.notes !== item.reason && (
+                      <p className="text-xs text-muted-foreground mt-1">ملاحظة: {item.notes}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </section>
 

@@ -1076,6 +1076,7 @@ function AssignmentModal({ guards, onClose }: { guards: Guard[]; onClose: () => 
       startDate,
       endDate,
       reason: reason.trim(),
+      currentSchool: guard.schoolName || "بدون مدرسة",
     }, currentUser?.name ?? "النظام");
     assignGuard(op, guard);
 
@@ -1490,7 +1491,8 @@ function EditGuardModal({ guards, schools, onClose }: { guards: Guard[]; schools
     if (jobTitle.trim() !== (guard.jobTitle || guard.jobType || "")) changes.push("المسمى");
     if (rank.trim() !== (guard.rank || "")) changes.push("المرتبة");
     if (status !== guard.status) changes.push("الحالة");
-    if (school?.id !== guard.schoolId) changes.push("المدرسة");
+    const schoolChanged = school?.id !== guard.schoolId;
+    if (schoolChanged) changes.push("المدرسة");
 
     const patch: Partial<Guard> = {
       name: name.trim(),
@@ -1503,9 +1505,17 @@ function EditGuardModal({ guards, schools, onClose }: { guards: Guard[]; schools
       schoolName: school?.name ?? null,
       governorate: governorate.trim(),
     };
-    const op = makeOp("تعديل بيانات", guard.id, guard.name, todayStr(), notes, {
+    const details: Record<string, string> = {
       summary: changes.length > 0 ? `تعديل: ${changes.join("، ")}` : "مراجعة البيانات",
-    }, currentUser?.name ?? "النظام");
+    };
+    if (schoolChanged) {
+      details.fromSchoolName = guard.schoolName || "بدون مدرسة";
+      details.fromSchoolId = guard.schoolId || "";
+      details.toSchoolName = school?.name ?? "بدون مدرسة";
+      details.toSchoolId = school?.id ?? "";
+      details.reason = notes.trim();
+    }
+    const op = makeOp("تعديل بيانات", guard.id, guard.name, todayStr(), notes, details, currentUser?.name ?? "النظام");
     updateGuard(guard.id, patch, op);
     onClose();
   }
