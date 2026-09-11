@@ -6,7 +6,7 @@ import GuardProfile from "../components/GuardProfile";
 import type { Guard, School, Operation } from "../types";
 import type { Employee } from "../store/useUsers";
 import {
-  Search, FileText, Users, SlidersHorizontal, X, Briefcase,
+  Search, FileText, Users, X, Briefcase,
   Download, Pencil, Trash2, Eye, EyeOff, Save, AlertTriangle,
   Check, ChevronsUpDown,
 } from "lucide-react";
@@ -669,9 +669,6 @@ export default function Guards() {
   const initialState = useMemo(initGuardsState, []);
   const [search, setSearch] = useState(initialState.search);
   const [filters, setFilters] = useState<FilterState>(initialState.filters);
-  const [filtersOpen, setFiltersOpen] = useState(
-    () => hasActiveFilters(initialState.filters) || initialState.search !== ""
-  );
   const tableScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -907,24 +904,6 @@ export default function Guards() {
               )}
             </button>
           )}
-          {/* Toggle filters panel */}
-          {guards.length > 0 && (
-            <button
-              onClick={() => setFiltersOpen((o) => !o)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-semibold transition-colors
-                ${filtersOpen || activeCount > 0
-                  ? "border-primary bg-primary/5 text-primary"
-                  : "border-border bg-white text-foreground hover:border-primary/40"}`}
-            >
-              <SlidersHorizontal className="w-4 h-4" />
-              فلاتر
-              {activeCount > 0 && (
-                <span className="bg-primary text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                  {activeCount}
-                </span>
-              )}
-            </button>
-          )}
           {/* Export button */}
           {guards.length > 0 && (
             <button
@@ -940,7 +919,7 @@ export default function Guards() {
       </div>
 
       {/* ── Filter panel ───────────────────────────────────────────────────── */}
-      {guards.length > 0 && filtersOpen && (
+      {guards.length > 0 && (
         <div className="bg-white border border-border rounded-xl shadow-sm p-4 space-y-4 dark:bg-card">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
             <FilterSelect
