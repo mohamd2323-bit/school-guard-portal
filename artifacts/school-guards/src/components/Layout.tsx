@@ -7,7 +7,6 @@ import {
   AlertTriangle,
   ClipboardList,
   Database,
-  Headphones,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -42,7 +41,6 @@ const navGroups = [
       { href: "/needs", label: "الاحتياج", icon: ClipboardList },
       { href: "/operations", label: "إدارة العمليات", icon: Settings2 },
       { href: "/violations", label: "المخالفات", icon: AlertTriangle },
-      { href: "/tickets", label: "بلاغات الدعم الموحد", icon: Headphones },
     ],
   },
   {
@@ -244,7 +242,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               title="البحث العالمي سيضاف في مرحلة لاحقة"
             >
               <Search className="h-4 w-4" />
-              <span className="truncate">بحث عام في الحراس والمدارس والبلاغات...</span>
+              <span className="truncate">بحث عام في الحراس والمدارس...</span>
             </button>
 
             <div className="hidden items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 dark:border-emerald-900/70 dark:bg-emerald-950/60 dark:text-emerald-200 md:flex">

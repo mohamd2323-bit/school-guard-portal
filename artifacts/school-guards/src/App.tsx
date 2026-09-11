@@ -6,7 +6,6 @@ import Guards from "./pages/Guards";
 import Schools from "./pages/Schools";
 import DataManagement from "./pages/DataManagement";
 import Needs from "./pages/Needs";
-import Tickets from "./pages/Tickets";
 import Operations from "./pages/Operations";
 import Violations from "./pages/Violations";
 import Users from "./pages/Users";
@@ -26,7 +25,6 @@ const PAGE_TITLES: Record<string, string> = {
   "/operations": "وزارة التعليم | العمليات",
   "/needs": "وزارة التعليم | الاحتياج",
   "/violations": "وزارة التعليم | المخالفات",
-  "/tickets": "وزارة التعليم | بلاغات الدعم",
   "/data": "وزارة التعليم | إدارة البيانات",
   "/users": "وزارة التعليم | الإعدادات",
 };
@@ -79,7 +77,6 @@ function Router() {
         <Route path="/needs" component={Needs} />
         <Route path="/operations" component={Operations} />
         <Route path="/violations" component={Violations} />
-        <Route path="/tickets" component={Tickets} />
         <Route path="/data" component={DataManagement} />
         <Route path="/users">
           {() => (
