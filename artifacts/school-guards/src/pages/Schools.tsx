@@ -51,25 +51,29 @@ function googleMapsSchoolUrl(school: School) {
 // ─── Filter type & persistence ────────────────────────────────────────────────
 
 type GuardFilter = "all" | "no-guard" | "has-guard";
+type SchoolUserFilter = "all" | "no-staff" | "has-staff";
 
 const SCHOOLS_STORAGE_KEY = "schoolsFilters";
 
 interface SchoolsPersistedState {
   search: string;
   guardFilter: GuardFilter;
+  schoolUserFilter: SchoolUserFilter;
   governorateFilter: string;
   typeFilter: string;
 }
 
 function initSchoolsState(): SchoolsPersistedState {
   const p = new URLSearchParams(window.location.search);
-  const hasUrlFilters = p.get("guard") || p.get("q") || p.get("governorate") || p.get("type");
+  const hasUrlFilters = p.get("guard") || p.get("staff") || p.get("q") || p.get("governorate") || p.get("type");
   if (hasUrlFilters) {
     const v = p.get("guard");
+    const staff = p.get("staff");
     const type = p.get("type") ?? "";
     return {
       search: p.get("q") ?? "",
       guardFilter: v === "no-guard" || v === "has-guard" ? v : "all",
+      schoolUserFilter: staff === "no-staff" || staff === "has-staff" ? staff : "all",
       governorateFilter: displayGovernorate(p.get("governorate")),
       typeFilter: type === "بنين" || type === "بنات" || type === "مختلط" ? type : "",
     };
@@ -82,13 +86,14 @@ function initSchoolsState(): SchoolsPersistedState {
         return {
           search: stored.search ?? "",
           guardFilter: stored.guardFilter,
+          schoolUserFilter: stored.schoolUserFilter ?? "all",
           governorateFilter: displayGovernorate(stored.governorateFilter),
           typeFilter: stored.typeFilter ?? "",
         };
       }
     }
   } catch {}
-  return { search: "", guardFilter: "all", governorateFilter: "", typeFilter: "" };
+  return { search: "", guardFilter: "all", schoolUserFilter: "all", governorateFilter: "", typeFilter: "" };
 }
 
 function SchoolFilterSelect({
@@ -610,25 +615,27 @@ export default function Schools() {
   const initialState = useMemo(initSchoolsState, []);
   const [search, setSearch] = useState(initialState.search);
   const [guardFilter, setGuardFilter] = useState<GuardFilter>(initialState.guardFilter);
+  const [schoolUserFilter, setSchoolUserFilter] = useState<SchoolUserFilter>(initialState.schoolUserFilter);
   const [governorateFilter, setGovernorateFilter] = useState(initialState.governorateFilter);
   const [typeFilter, setTypeFilter] = useState(initialState.typeFilter);
   const tableScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const state: SchoolsPersistedState = { search, guardFilter, governorateFilter, typeFilter };
+    const state: SchoolsPersistedState = { search, guardFilter, schoolUserFilter, governorateFilter, typeFilter };
     try { sessionStorage.setItem(SCHOOLS_STORAGE_KEY, JSON.stringify(state)); } catch {}
     const p = new URLSearchParams();
     if (search) p.set("q", search);
     if (guardFilter !== "all") p.set("guard", guardFilter);
+    if (schoolUserFilter !== "all") p.set("staff", schoolUserFilter);
     if (governorateFilter) p.set("governorate", governorateFilter);
     if (typeFilter) p.set("type", typeFilter);
     const qs = p.toString();
     navigate("/schools" + (qs ? "?" + qs : ""), { replace: true });
-  }, [guardFilter, governorateFilter, search, typeFilter, navigate]);
+  }, [guardFilter, schoolUserFilter, governorateFilter, search, typeFilter, navigate]);
 
   useEffect(() => {
     if (tableScrollRef.current) tableScrollRef.current.scrollTop = 0;
-  }, [governorateFilter, guardFilter, search, typeFilter]);
+  }, [governorateFilter, guardFilter, schoolUserFilter, search, typeFilter]);
 
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [actionModal, setActionModal] = useState<ActionModal | null>(null);
@@ -670,6 +677,16 @@ export default function Schools() {
     [schoolUserCountMap]
   );
 
+  const eligibleSchoolUserSchools = useMemo(
+    () => schools.filter((school) => school.type === "بنات" || school.type === "مختلط"),
+    [schools]
+  );
+
+  const noSchoolUserCount = useMemo(
+    () => eligibleSchoolUserSchools.filter((school) => !schoolUserCountMap.has(school.id)).length,
+    [eligibleSchoolUserSchools, schoolUserCountMap]
+  );
+
   const noGuardCount = useMemo(() =>
     schools.filter((s) => !guardCountMap.has(s.id)).length,
     [schools, guardCountMap]
@@ -683,10 +700,17 @@ export default function Schools() {
   const filtered = useMemo(() => {
     return schools.filter((s) => {
       const hasGuard = guardCountMap.has(s.id);
+      const canHaveSchoolUsers = s.type === "بنات" || s.type === "مختلط";
+      const hasSchoolUsers = canHaveSchoolUsers && schoolUserCountMap.has(s.id);
       const matchesFilter =
         guardFilter === "all" ||
         (guardFilter === "no-guard" && !hasGuard) ||
         (guardFilter === "has-guard" && hasGuard);
+      const matchesSchoolUserFilter =
+        schoolUserFilter === "all" ||
+        (canHaveSchoolUsers &&
+          ((schoolUserFilter === "no-staff" && !hasSchoolUsers) ||
+            (schoolUserFilter === "has-staff" && hasSchoolUsers)));
       const matchesGovernorate = !governorateFilter || governorateKey(s.governorate) === governorateKey(governorateFilter);
       const matchesType = !typeFilter || s.type.trim() === typeFilter;
       const q = search.trim();
@@ -696,14 +720,19 @@ export default function Schools() {
         s.level.includes(q) ||
         s.principalName.includes(q) ||
         s.principalNationalId.includes(q);
-      return matchesFilter && matchesGovernorate && matchesType && matchesSearch;
+      return matchesFilter && matchesSchoolUserFilter && matchesGovernorate && matchesType && matchesSearch;
     });
-  }, [schools, guardCountMap, governorateFilter, guardFilter, search, typeFilter]);
+  }, [schools, guardCountMap, schoolUserCountMap, schoolUserFilter, governorateFilter, guardFilter, search, typeFilter]);
 
   const statusOptions = useMemo(() => [
     { value: "no-guard", label: `بدون حارس (${noGuardCount.toLocaleString("ar-SA")})` },
     { value: "has-guard", label: `مرتبطة (${(schools.length - noGuardCount).toLocaleString("ar-SA")})` },
   ], [noGuardCount, schools.length]);
+
+  const schoolUserStatusOptions = useMemo(() => [
+    { value: "no-staff", label: `بدون حارسات (${noSchoolUserCount.toLocaleString("ar-SA")})` },
+    { value: "has-staff", label: `مرتبطة (${(eligibleSchoolUserSchools.length - noSchoolUserCount).toLocaleString("ar-SA")})` },
+  ], [eligibleSchoolUserSchools.length, noSchoolUserCount]);
 
   function handleSaveSchool(data: Omit<School, "id" | "isDemo">) {
     if (formModal?.mode === "edit") {
@@ -864,7 +893,15 @@ export default function Schools() {
                   <th>سجل المدير/ة</th>
                   <th>جوال المدير/ة</th>
                   <th>عدد الحراس</th>
-                  <th>عدد المستخدمات</th>
+                  <th>
+                    <SchoolFilterSelect
+                      label="المستخدمات"
+                      value={schoolUserFilter === "all" ? "" : schoolUserFilter}
+                      options={schoolUserStatusOptions}
+                      onChange={(value) => setSchoolUserFilter((value || "all") as SchoolUserFilter)}
+                      compact
+                    />
+                  </th>
                   <th>
                     <SchoolFilterSelect
                       label="الحالة"
