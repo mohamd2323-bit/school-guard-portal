@@ -10,6 +10,7 @@ import { useUsers } from "../store/useUsers";
 import type { Guard } from "../types";
 import { getRandomMotivationalMessage } from "../data/motivationalMessages";
 import { buildMaleGuardsBySchool } from "../lib/guardCoverage";
+import { governorateKey, uniqueGovernorates } from "../lib/governorates";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -160,10 +161,10 @@ export default function Dashboard() {
 
   // Unique filter options
   const govOptions = useMemo(() =>
-    [...new Set([
-      ...guards.map((g) => g.governorate?.trim()).filter(Boolean),
-      ...schools.map((s) => s.governorate?.trim()).filter(Boolean),
-    ])].sort() as string[],
+    uniqueGovernorates([
+      ...guards.map((g) => g.governorate),
+      ...schools.map((s) => s.governorate),
+    ]),
     [guards, schools]
   );
 
@@ -175,7 +176,7 @@ export default function Dashboard() {
   // Filtered guards
   const filteredGuards = useMemo(() =>
     guards.filter((g) =>
-      (!filterGov || g.governorate?.trim() === filterGov) &&
+      (!filterGov || governorateKey(g.governorate) === governorateKey(filterGov)) &&
       (!filterGender || g.gender === filterGender) &&
       (!filterStatus || g.status === filterStatus) &&
       (!filterJob || jobLabel(g) === filterJob)
@@ -185,12 +186,12 @@ export default function Dashboard() {
 
   // Filtered schools (governorate filter only)
   const filteredSchools = useMemo(() =>
-    filterGov ? schools.filter((s) => s.governorate?.trim() === filterGov) : schools,
+    filterGov ? schools.filter((s) => governorateKey(s.governorate) === governorateKey(filterGov)) : schools,
     [schools, filterGov]
   );
 
   const filteredNeeds = useMemo(() =>
-    filterGov ? needs.filter((n) => n.governorate?.trim() === filterGov) : needs,
+    filterGov ? needs.filter((n) => governorateKey(n.governorate) === governorateKey(filterGov)) : needs,
     [needs, filterGov]
   );
 

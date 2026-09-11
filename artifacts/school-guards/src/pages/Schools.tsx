@@ -10,6 +10,7 @@ import {
 import SchoolProfile from "../components/SchoolProfile";
 import { exportSchoolsWorkbook } from "../lib/schoolsExcelExport";
 import { buildMaleGuardsBySchool } from "../lib/guardCoverage";
+import { displayGovernorate, governorateKey, uniqueGovernorates } from "../lib/governorates";
 import type { School, Guard, Need, NeedType, Operation } from "../types";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -26,33 +27,6 @@ function unique(values: (string | undefined | null)[]): string[] {
   return Array.from(new Set(values.map((value) => value?.trim()).filter(Boolean) as string[])).sort((a, b) =>
     a.localeCompare(b, "ar")
   );
-}
-
-function governorateKey(value: string | undefined | null) {
-  return (value ?? "")
-    .trim()
-    .replace(/\u0640/g, "")
-    .replace(/[\u064B-\u065F\u0670]/g, "")
-    .replace(/[إأآٱ]/g, "ا")
-    .replace(/\s+/g, " ");
-}
-
-function displayGovernorate(value: string | undefined | null) {
-  const key = governorateKey(value);
-  if (key === "ابها") return "أبها";
-  return (value ?? "").trim();
-}
-
-function uniqueGovernorates(values: (string | undefined | null)[]): string[] {
-  const byKey = new Map<string, string>();
-
-  values.forEach((value) => {
-    const key = governorateKey(value);
-    if (!key) return;
-    byKey.set(key, displayGovernorate(value));
-  });
-
-  return Array.from(byKey.values()).sort((a, b) => a.localeCompare(b, "ar"));
 }
 
 function makeOp(
