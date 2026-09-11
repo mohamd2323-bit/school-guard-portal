@@ -90,10 +90,13 @@ function SchoolFilterSelect({
 }: {
   label: string;
   value: string;
-  options: string[];
+  options: Array<string | { value: string; label: string }>;
   onChange: (value: string) => void;
 }) {
   const active = value !== "";
+  const optionItems = options.map((option) =>
+    typeof option === "string" ? { value: option, label: option } : option
+  );
 
   return (
     <div className="relative min-w-[10rem]">
@@ -105,8 +108,8 @@ function SchoolFilterSelect({
         title={label}
       >
         <option value="">{label}: الكل</option>
-        {options.map((option) => (
-          <option key={option} value={option}>{option}</option>
+        {optionItems.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
         ))}
       </select>
       {active ? (
@@ -665,11 +668,10 @@ export default function Schools() {
     });
   }, [schools, guardCountMap, governorateFilter, guardFilter, search, typeFilter]);
 
-  const FILTER_TABS: { key: GuardFilter; label: string }[] = [
-    { key: "all", label: `جميع المدارس (${schools.length})` },
-    { key: "no-guard", label: `بدون حارس (${noGuardCount})` },
-    { key: "has-guard", label: `مرتبطة بحارس (${schools.length - noGuardCount})` },
-  ];
+  const statusOptions = useMemo(() => [
+    { value: "no-guard", label: `بدون حارس (${noGuardCount.toLocaleString("ar-SA")})` },
+    { value: "has-guard", label: `مرتبطة (${(schools.length - noGuardCount).toLocaleString("ar-SA")})` },
+  ], [noGuardCount, schools.length]);
 
   function handleSaveSchool(data: Omit<School, "id" | "isDemo">) {
     if (formModal?.mode === "edit") {
@@ -738,22 +740,6 @@ export default function Schools() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {schools.length > 0 && (
-            <>
-              <SchoolFilterSelect
-                label="المحافظة"
-                value={governorateFilter}
-                options={filterOptions.governorates}
-                onChange={setGovernorateFilter}
-              />
-              <SchoolFilterSelect
-                label="النوع"
-                value={typeFilter}
-                options={filterOptions.types.length ? filterOptions.types : SCHOOL_TYPES}
-                onChange={setTypeFilter}
-              />
-            </>
-          )}
           <div className="relative">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
@@ -799,27 +785,27 @@ export default function Schools() {
         </div>
       )}
 
-      {/* Filter tabs */}
+      {/* Filters */}
       {schools.length > 0 && (
-        <div className="flex gap-2 flex-wrap">
-          {FILTER_TABS.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setGuardFilter(tab.key)}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold border-2 transition-all
-                ${guardFilter === tab.key
-                  ? tab.key === "no-guard"
-                    ? "border-orange-400 bg-orange-50 text-orange-800"
-                    : "border-primary bg-primary text-white"
-                  : "border-border bg-white text-foreground hover:border-primary/40"
-                }`}
-            >
-              {tab.key === "no-guard" && guardFilter === tab.key && (
-                <AlertTriangle className="w-3.5 h-3.5 inline ml-1.5 -mt-0.5" />
-              )}
-              {tab.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-end gap-3">
+          <SchoolFilterSelect
+            label="الحالة"
+            value={guardFilter === "all" ? "" : guardFilter}
+            options={statusOptions}
+            onChange={(value) => setGuardFilter((value || "all") as GuardFilter)}
+          />
+          <SchoolFilterSelect
+            label="المحافظة"
+            value={governorateFilter}
+            options={filterOptions.governorates}
+            onChange={setGovernorateFilter}
+          />
+          <SchoolFilterSelect
+            label="النوع"
+            value={typeFilter}
+            options={filterOptions.types.length ? filterOptions.types : SCHOOL_TYPES}
+            onChange={setTypeFilter}
+          />
         </div>
       )}
 
