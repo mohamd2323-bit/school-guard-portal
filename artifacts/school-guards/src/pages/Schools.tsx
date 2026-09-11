@@ -31,6 +31,7 @@ function unique(values: (string | undefined | null)[]): string[] {
 function governorateKey(value: string | undefined | null) {
   return (value ?? "")
     .trim()
+    .replace(/\u0640/g, "")
     .replace(/[\u064B-\u065F\u0670]/g, "")
     .replace(/[إأآٱ]/g, "ا")
     .replace(/\s+/g, " ");
