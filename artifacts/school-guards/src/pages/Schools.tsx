@@ -6,7 +6,7 @@ import {
   Search, School as SchoolIcon, FolderOpen, AlertTriangle,
   UserPlus, Briefcase, ClipboardList, X, Shield,
   Plus, Pencil, Trash2, Lock, Eye, EyeOff, Download, ChevronDown,
-  MapPin,
+  MapPin, Users,
 } from "lucide-react";
 import SchoolProfile from "../components/SchoolProfile";
 import { exportSchoolsWorkbook } from "../lib/schoolsExcelExport";
@@ -650,6 +650,20 @@ export default function Schools() {
     [guards]
   );
 
+  const schoolUserCountMap = useMemo(() => {
+    const counts = new Map<string, number>();
+    guards.forEach((guard) => {
+      if (!guard.schoolId || guard.gender === "ذكر") return;
+      counts.set(guard.schoolId, (counts.get(guard.schoolId) ?? 0) + 1);
+    });
+    return counts;
+  }, [guards]);
+
+  const schoolUserCount = useMemo(
+    () => Array.from(schoolUserCountMap.values()).reduce((total, count) => total + count, 0),
+    [schoolUserCountMap]
+  );
+
   const noGuardCount = useMemo(() =>
     schools.filter((s) => !guardCountMap.has(s.id)).length,
     [schools, guardCountMap]
@@ -783,11 +797,12 @@ export default function Schools() {
 
       {/* Stats bar */}
       {schools.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { label: "إجمالي المدارس", value: schools.length, color: "bg-white border-border text-foreground" },
             { label: "مدارس بدون حارس", value: noGuardCount, color: noGuardCount > 0 ? "bg-orange-50 border-orange-200 text-orange-800" : "bg-green-50 border-green-200 text-green-800" },
             { label: "مدارس مرتبطة بحارس", value: schools.length - noGuardCount, color: "bg-teal-50 border-teal-200 text-teal-800" },
+            { label: "المستخدمات بالمدارس", value: schoolUserCount, color: "bg-pink-50 border-pink-200 text-pink-800" },
           ].map((s) => (
             <div key={s.label} className={`border rounded-xl p-3 text-center ${s.color}`}>
               <p className="text-xl font-bold">{s.value.toLocaleString("ar-SA")}</p>
@@ -843,6 +858,7 @@ export default function Schools() {
                   <th>سجل المدير/ة</th>
                   <th>جوال المدير/ة</th>
                   <th>عدد الحراس</th>
+                  <th>عدد المستخدمات</th>
                   <th>
                     <SchoolFilterSelect
                       label="الحالة"
@@ -858,6 +874,7 @@ export default function Schools() {
               <tbody>
                 {filtered.map((school) => {
                   const count = guardCountMap.get(school.id) ?? 0;
+                  const userCount = schoolUserCountMap.get(school.id) ?? 0;
                   const noGuard = count === 0;
                   return (
                     <tr
@@ -895,6 +912,20 @@ export default function Schools() {
                             }`}>
                             <Shield className="w-3 h-3" />
                             {count}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* School users count */}
+                      <td>
+                        <div className="flex items-center justify-center">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold
+                            ${userCount > 0
+                              ? "bg-pink-100 text-pink-700"
+                              : "bg-muted text-muted-foreground"
+                            }`}>
+                            <Users className="w-3 h-3" />
+                            {userCount}
                           </span>
                         </div>
                       </td>
