@@ -11,6 +11,7 @@ import {
   Check, ChevronsUpDown,
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import { displayGovernorate, governorateKey, uniqueGovernorates } from "../lib/governorates";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -67,8 +68,18 @@ function toArray(value: unknown): string[] {
   return typeof value === "string" && value !== "" ? [value] : [];
 }
 
+function toGovernorateArray(value: unknown): string[] {
+  return uniqueGovernorates(toArray(value));
+}
+
 function matchAny(selected: string[], value: string | null | undefined) {
   return selected.length === 0 || selected.includes(value ?? "");
+}
+
+function matchGovernorate(selected: string[], value: string | null | undefined) {
+  if (selected.length === 0) return true;
+  const valueKey = governorateKey(value);
+  return selected.some((selectedValue) => governorateKey(selectedValue) === valueKey);
 }
 
 // ─── Single select dropdown ───────────────────────────────────────────────────
@@ -273,7 +284,7 @@ function initGuardsState(): GuardsPersistedState {
     return {
       search: p.get("q") ?? "",
       filters: {
-        governorate: p.getAll("governorate").filter(Boolean),
+        governorate: uniqueGovernorates(p.getAll("governorate").filter(Boolean)),
         schoolName: p.get("schoolName") ?? "",
         gender: gender === "ذكر" || gender === "أنثى" ? gender : "",
         jobTitle: p.getAll("jobTitle").filter(Boolean),
@@ -295,7 +306,7 @@ function initGuardsState(): GuardsPersistedState {
           filters: {
             ...EMPTY_FILTERS,
             ...stored.filters,
-            governorate: toArray(stored.filters.governorate),
+            governorate: toGovernorateArray(stored.filters.governorate),
             jobTitle: toArray(stored.filters.jobTitle),
             rank: toArray(stored.filters.rank),
           },
@@ -684,7 +695,7 @@ export default function Guards() {
     try { sessionStorage.setItem(GUARDS_STORAGE_KEY, JSON.stringify(state)); } catch {}
     const p = new URLSearchParams();
     if (search) p.set("q", search);
-    filters.governorate.forEach((value) => p.append("governorate", value));
+    filters.governorate.forEach((value) => p.append("governorate", displayGovernorate(value)));
     if (filters.schoolName) p.set("schoolName", filters.schoolName);
     if (filters.gender) p.set("gender", filters.gender);
     filters.jobTitle.forEach((value) => p.append("jobTitle", value));
@@ -707,7 +718,7 @@ export default function Guards() {
 
   // Derive unique option lists from real data
   const options = useMemo(() => ({
-    governorate: unique(guards.map((g) => g.governorate)),
+    governorate: uniqueGovernorates(guards.map((g) => g.governorate)),
     schoolName: unique(guards.map((g) => g.schoolName)),
     gender: unique(guards.map((g) => g.gender)),
     jobTitle: unique(guards.map((g) => g.jobTitle)),
@@ -735,7 +746,7 @@ export default function Guards() {
         (g.jobType || "").includes(q) ||
         (g.rank || "").includes(q);
 
-      const matchGovernorate = matchAny(filters.governorate, g.governorate);
+      const matchGovernorateValue = matchGovernorate(filters.governorate, g.governorate);
       const matchSchool = !filters.schoolName || g.schoolName === filters.schoolName;
       const matchGender = !filters.gender || g.gender === filters.gender;
       const matchJobTitle = matchAny(filters.jobTitle, g.jobTitle);
@@ -753,7 +764,7 @@ export default function Guards() {
 
       return (
         matchSearch &&
-        matchGovernorate &&
+        matchGovernorateValue &&
         matchSchool &&
         matchGender &&
         matchJobTitle &&
@@ -786,14 +797,14 @@ export default function Guards() {
         (g.schoolName || "").includes(q) ||
         (g.jobType || "").includes(q) ||
         (g.rank || "").includes(q);
-      const matchGovernorate = matchAny(filters.governorate, g.governorate);
+      const matchGovernorateValue = matchGovernorate(filters.governorate, g.governorate);
       const matchSchool = !filters.schoolName || g.schoolName === filters.schoolName;
       const matchGender = !filters.gender || g.gender === filters.gender;
       const matchJobTitle = matchAny(filters.jobTitle, g.jobTitle);
       const matchRank = matchAny(filters.rank, g.rank);
       const matchJobType = !filters.jobType || g.jobType === filters.jobType;
       const matchStatus = !filters.status || g.status === filters.status;
-      if (matchSearch && matchGovernorate && matchSchool && matchGender && matchJobTitle && matchRank && matchJobType && matchStatus) {
+      if (matchSearch && matchGovernorateValue && matchSchool && matchGender && matchJobTitle && matchRank && matchJobType && matchStatus) {
         if (assignedGuardIds.has(g.id)) assigned++;
         else unassigned++;
       }
