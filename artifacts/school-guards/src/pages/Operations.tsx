@@ -48,6 +48,16 @@ function formatDate(d: string) {
   } catch { return d; }
 }
 
+function employeeKey(value: string | undefined | null) {
+  return (value ?? "")
+    .trim()
+    .replace(/\u0640/g, "")
+    .replace(/[\u064B-\u065F\u0670]/g, "")
+    .replace(/[إأآٱ]/g, "ا")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
 function makeOp(
   type: OperationType,
   guardId: string | null,
@@ -1831,6 +1841,7 @@ function buildReportHTML(ops: Operation[], filterLabel: string): string {
 
 export default function Operations() {
   const { guards, schools, operations, cancelAssignment } = useStore();
+  const { employees } = useUsers();
   const [activeModal, setActiveModal] = useState<ModalKey | null>(null);
   const [cancelDialogOp, setCancelDialogOp] = useState<Operation | null>(null);
 
@@ -1851,11 +1862,30 @@ export default function Operations() {
   }
 
   // ── dropdown options (dynamic from data) ──
+  const employeeNameByKey = useMemo(() => {
+    const map = new Map<string, string>();
+    employees.forEach((employee) => {
+      const displayName = employee.name.trim() || employee.username;
+      map.set(employeeKey(employee.username), displayName);
+      map.set(employeeKey(employee.name), displayName);
+    });
+    return map;
+  }, [employees]);
+
+  const employeeDisplayName = (value: string | undefined | null) => {
+    const trimmed = value?.trim();
+    if (!trimmed) return "—";
+    return employeeNameByKey.get(employeeKey(trimmed)) ?? trimmed;
+  };
+
   const uniqueEmployees = useMemo(() => {
     const s = new Set<string>();
-    operations.forEach((op) => { if (op.performedBy) s.add(op.performedBy); });
-    return Array.from(s).sort();
-  }, [operations]);
+    operations.forEach((op) => {
+      const displayName = employeeDisplayName(op.performedBy);
+      if (displayName !== "—") s.add(displayName);
+    });
+    return Array.from(s).sort((a, b) => a.localeCompare(b, "ar"));
+  }, [operations, employeeNameByKey]);
 
   const uniqueGuards = useMemo(() => {
     const s = new Set<string>();
@@ -1867,7 +1897,7 @@ export default function Operations() {
   const filtered = useMemo(() => {
     return operations.filter((op) => {
       if (fType && op.type !== fType) return false;
-      if (fEmployee && op.performedBy !== fEmployee) return false;
+      if (fEmployee && employeeDisplayName(op.performedBy) !== fEmployee) return false;
       if (fGuard && op.guardName !== fGuard) return false;
       if (fSchool) {
         const school =
@@ -1878,7 +1908,7 @@ export default function Operations() {
       if (fDateTo   && op.date > fDateTo)   return false;
       return true;
     });
-  }, [operations, fType, fEmployee, fGuard, fSchool, fDateFrom, fDateTo]);
+  }, [operations, fType, fEmployee, fGuard, fSchool, fDateFrom, fDateTo, employeeNameByKey]);
 
   // ── export helpers ──
   function filterLabel() {
@@ -1895,7 +1925,7 @@ export default function Operations() {
   function handlePrint() {
     const win = window.open("", "_blank", "width=1150,height=780");
     if (!win) return;
-    win.document.write(buildReportHTML(filtered, filterLabel()));
+    win.document.write(buildReportHTML(filtered.map((op) => ({ ...op, performedBy: employeeDisplayName(op.performedBy) })), filterLabel()));
     win.document.close();
     win.onload = () => { win.focus(); win.print(); };
   }
@@ -1903,7 +1933,7 @@ export default function Operations() {
   function handlePDF() {
     const win = window.open("", "_blank", "width=1150,height=780");
     if (!win) return;
-    win.document.write(buildReportHTML(filtered, filterLabel()));
+    win.document.write(buildReportHTML(filtered.map((op) => ({ ...op, performedBy: employeeDisplayName(op.performedBy) })), filterLabel()));
     win.document.close();
     win.onload = () => { win.focus(); win.print(); };
   }
@@ -1913,7 +1943,7 @@ export default function Operations() {
         "نوع العملية":  op.type,
         "اسم الحارس":  op.guardName,
         "التفاصيل":    opSummary(op),
-        "تم بواسطة":   op.performedBy || "—",
+        "تم بواسطة":   employeeDisplayName(op.performedBy),
         "تاريخ العملية": op.date,
         "ملاحظات":     op.notes || "",
       }));
@@ -2173,7 +2203,7 @@ export default function Operations() {
                         <td>
                           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                             <User2 className="w-3.5 h-3.5 flex-shrink-0 text-primary/50" />
-                            <span className="font-medium text-foreground">{op.performedBy || "—"}</span>
+                            <span className="font-medium text-foreground">{employeeDisplayName(op.performedBy)}</span>
                           </div>
                         </td>
                         <td>
