@@ -58,6 +58,23 @@ function employeeKey(value: string | undefined | null) {
     .toLowerCase();
 }
 
+const EMPLOYEE_NAME_ALIASES = new Map<string, string>([
+  [employeeKey("ساره"), "ساره"],
+  [employeeKey("سارة"), "ساره"],
+  [employeeKey("ساره الجبل"), "ساره"],
+  [employeeKey("سارة الجبل"), "ساره"],
+  [employeeKey("سلمان"), "سلمان"],
+  [employeeKey("سلمان الجابري"), "سلمان"],
+  [employeeKey("سحاب"), "سحاب"],
+  [employeeKey("سحاب عسيري"), "سحاب"],
+  [employeeKey("محمد"), "محمد"],
+  [employeeKey("mohamd"), "محمد"],
+  [employeeKey("admin"), "محمد"],
+  [employeeKey("ادمن"), "محمد"],
+  [employeeKey("أدمن"), "محمد"],
+  [employeeKey("مدير النظام"), "محمد"],
+]);
+
 function makeOp(
   type: OperationType,
   guardId: string | null,
@@ -1875,7 +1892,8 @@ export default function Operations() {
   const employeeDisplayName = (value: string | undefined | null) => {
     const trimmed = value?.trim();
     if (!trimmed) return "—";
-    return employeeNameByKey.get(employeeKey(trimmed)) ?? trimmed;
+    const key = employeeKey(trimmed);
+    return EMPLOYEE_NAME_ALIASES.get(key) ?? employeeNameByKey.get(key) ?? trimmed;
   };
 
   const uniqueEmployees = useMemo(() => {
