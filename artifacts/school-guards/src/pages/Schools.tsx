@@ -6,6 +6,7 @@ import {
   Search, School as SchoolIcon, FolderOpen, AlertTriangle,
   UserPlus, Briefcase, ClipboardList, X, Shield,
   Plus, Pencil, Trash2, Lock, Eye, EyeOff, Download, ChevronDown,
+  MapPin,
 } from "lucide-react";
 import SchoolProfile from "../components/SchoolProfile";
 import { exportSchoolsWorkbook } from "../lib/schoolsExcelExport";
@@ -38,6 +39,13 @@ function makeOp(
   details: Record<string, string>
 ): Operation {
   return { id: genId(), type, guardId, guardName, date, notes, createdAt: new Date().toISOString(), details };
+}
+
+function googleMapsSchoolUrl(school: School) {
+  const query = [school.name, displayGovernorate(school.governorate), "السعودية"]
+    .filter(Boolean)
+    .join(" ");
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 
 // ─── Filter type & persistence ────────────────────────────────────────────────
@@ -915,6 +923,18 @@ export default function Schools() {
                             <FolderOpen className="w-3.5 h-3.5" />
                             ملف
                           </button>
+
+                          {/* خريطة */}
+                          <a
+                            href={googleMapsSchoolUrl(school)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="فتح موقع المدرسة في Google Maps"
+                            className="flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 px-2 py-1.5 rounded-lg transition-colors font-semibold"
+                          >
+                            <MapPin className="w-3.5 h-3.5" />
+                            خريطة
+                          </a>
 
                           {/* تعديل */}
                           <button
