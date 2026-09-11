@@ -31,7 +31,6 @@ interface FilterState {
   gender: string;
   jobTitle: string[];
   rank: string[];
-  jobType: string;
   status: string;
   assignment: string;
   noSchool: string;
@@ -43,7 +42,6 @@ const EMPTY_FILTERS: FilterState = {
   gender: "",
   jobTitle: [],
   rank: [],
-  jobType: "",
   status: "",
   assignment: "",
   noSchool: "",
@@ -272,7 +270,7 @@ interface GuardsPersistedState {
   filters: FilterState;
 }
 
-const FILTER_URL_KEYS = ["q", "governorate", "schoolName", "gender", "jobTitle", "rank", "jobType", "status", "assignment", "noSchool"];
+const FILTER_URL_KEYS = ["q", "governorate", "schoolName", "gender", "jobTitle", "rank", "status", "assignment", "noSchool"];
 
 function initGuardsState(): GuardsPersistedState {
   const p = new URLSearchParams(window.location.search);
@@ -289,7 +287,6 @@ function initGuardsState(): GuardsPersistedState {
         gender: gender === "ذكر" || gender === "أنثى" ? gender : "",
         jobTitle: p.getAll("jobTitle").filter(Boolean),
         rank: p.getAll("rank").filter(Boolean),
-        jobType: p.get("jobType") ?? "",
         status: status === "نشط" || status === "غير نشط" ? status : "",
         assignment: assignment === "مكلف" || assignment === "غير مكلف" ? assignment : "",
         noSchool: p.get("noSchool") === "true" ? "true" : "",
@@ -337,7 +334,6 @@ function EditGuardModal({
     gender: guard.gender as string,
     jobTitle: guard.jobTitle ?? "",
     rank: guard.rank ?? "",
-    jobType: guard.jobType ?? "",
     schoolId: guard.schoolId ?? "",
     status: guard.status as string,
   });
@@ -358,7 +354,6 @@ function EditGuardModal({
       gender: form.gender as "ذكر" | "أنثى",
       jobTitle: form.jobTitle.trim() || undefined,
       rank: form.rank.trim() || undefined,
-      jobType: form.jobType.trim() || undefined,
       schoolId: selectedSchool?.id ?? null,
       schoolName: selectedSchool?.name ?? null,
       status: form.status as "نشط" | "غير نشط",
@@ -479,17 +474,6 @@ function EditGuardModal({
                 type="text"
                 value={form.rank}
                 onChange={(e) => set("rank", e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
-            </div>
-
-            {/* نوع الوظيفة */}
-            <div className="col-span-2">
-              <label className="block text-xs font-semibold text-muted-foreground mb-1">نوع الوظيفة</label>
-              <input
-                type="text"
-                value={form.jobType}
-                onChange={(e) => set("jobType", e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
@@ -700,7 +684,6 @@ export default function Guards() {
     if (filters.gender) p.set("gender", filters.gender);
     filters.jobTitle.forEach((value) => p.append("jobTitle", value));
     filters.rank.forEach((value) => p.append("rank", value));
-    if (filters.jobType) p.set("jobType", filters.jobType);
     if (filters.status) p.set("status", filters.status);
     if (filters.assignment) p.set("assignment", filters.assignment);
     if (filters.noSchool) p.set("noSchool", filters.noSchool);
@@ -723,7 +706,6 @@ export default function Guards() {
     gender: unique(guards.map((g) => g.gender)),
     jobTitle: unique(guards.map((g) => g.jobTitle)),
     rank: unique(guards.map((g) => g.rank)),
-    jobType: unique(guards.map((g) => g.jobType)),
     status: unique(guards.map((g) => g.status)),
   }), [guards]);
 
@@ -743,7 +725,7 @@ export default function Guards() {
         g.nationalId.includes(q) ||
         g.phone.includes(q) ||
         (g.schoolName || "").includes(q) ||
-        (g.jobType || "").includes(q) ||
+        (g.jobTitle || "").includes(q) ||
         (g.rank || "").includes(q);
 
       const matchGovernorateValue = matchGovernorate(filters.governorate, g.governorate);
@@ -751,7 +733,6 @@ export default function Guards() {
       const matchGender = !filters.gender || g.gender === filters.gender;
       const matchJobTitle = matchAny(filters.jobTitle, g.jobTitle);
       const matchRank = matchAny(filters.rank, g.rank);
-      const matchJobType = !filters.jobType || g.jobType === filters.jobType;
       const matchStatus = !filters.status || g.status === filters.status;
       const isAssigned = assignedGuardIds.has(g.id);
       const matchAssignment =
@@ -769,7 +750,6 @@ export default function Guards() {
         matchGender &&
         matchJobTitle &&
         matchRank &&
-        matchJobType &&
         matchStatus &&
         matchAssignment &&
         matchNoSchool
@@ -795,16 +775,15 @@ export default function Guards() {
         g.nationalId.includes(q) ||
         g.phone.includes(q) ||
         (g.schoolName || "").includes(q) ||
-        (g.jobType || "").includes(q) ||
+        (g.jobTitle || "").includes(q) ||
         (g.rank || "").includes(q);
       const matchGovernorateValue = matchGovernorate(filters.governorate, g.governorate);
       const matchSchool = !filters.schoolName || g.schoolName === filters.schoolName;
       const matchGender = !filters.gender || g.gender === filters.gender;
       const matchJobTitle = matchAny(filters.jobTitle, g.jobTitle);
       const matchRank = matchAny(filters.rank, g.rank);
-      const matchJobType = !filters.jobType || g.jobType === filters.jobType;
       const matchStatus = !filters.status || g.status === filters.status;
-      if (matchSearch && matchGovernorateValue && matchSchool && matchGender && matchJobTitle && matchRank && matchJobType && matchStatus) {
+      if (matchSearch && matchGovernorateValue && matchSchool && matchGender && matchJobTitle && matchRank && matchStatus) {
         if (assignedGuardIds.has(g.id)) assigned++;
         else unassigned++;
       }
@@ -822,14 +801,14 @@ export default function Guards() {
       "السجل المدني": g.nationalId,
       "رقم الجوال": g.phone,
       "المدرسة الحالية": g.schoolName ?? "",
-      "نوع الوظيفة": g.jobType ?? "",
+      "المسمى الوظيفي": g.jobTitle ?? "",
       "المرتبة": g.rank ?? "",
       "الحالة": g.status,
       "التكليف": assignedGuardIds.has(g.id) ? "مكلف" : "غير مكلف",
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows, {
-      header: ["اسم الحارس", "السجل المدني", "رقم الجوال", "المدرسة الحالية", "نوع الوظيفة", "المرتبة", "الحالة", "التكليف"],
+      header: ["اسم الحارس", "السجل المدني", "رقم الجوال", "المدرسة الحالية", "المسمى الوظيفي", "المرتبة", "الحالة", "التكليف"],
     });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "الحراس");
@@ -997,12 +976,6 @@ export default function Guards() {
               onChange={(v) => setFilter("rank", v as string[])}
             />
             <FilterSelect
-              label="نوع الوظيفة"
-              value={filters.jobType}
-              options={options.jobType}
-              onChange={(v) => setFilter("jobType", v)}
-            />
-            <FilterSelect
               label="الحالة"
               value={filters.status}
               options={options.status.length ? options.status : ["نشط", "غير نشط"]}
@@ -1100,7 +1073,7 @@ export default function Guards() {
                   <th>السجل المدني</th>
                   <th>رقم الجوال</th>
                   <th>المدرسة الحالية</th>
-                  <th>نوع الوظيفة</th>
+                  <th>المسمى الوظيفي</th>
                   <th>المرتبة</th>
                   <th>الحالة</th>
                 </tr>
@@ -1161,8 +1134,8 @@ export default function Guards() {
                     </td>
                     <td>{guard.schoolName || <span className="text-muted-foreground text-xs">غير محدد</span>}</td>
                     <td>
-                      {guard.jobType ? (
-                        <span className="text-sm text-foreground">{guard.jobType}</span>
+                      {guard.jobTitle ? (
+                        <span className="text-sm text-foreground">{guard.jobTitle}</span>
                       ) : (
                         <span className="text-muted-foreground text-xs">—</span>
                       )}
