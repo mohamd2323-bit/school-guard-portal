@@ -3,7 +3,7 @@ import {
   Users as UsersIcon, UserPlus, Lock, Eye, EyeOff,
   ShieldCheck, Edit2, CheckCircle, XCircle, X,
   LogIn, LogOut, Crown, Briefcase, KeyRound,
-  Power, PowerOff, ChevronDown, Calendar,
+  Power, PowerOff, ChevronDown, Calendar, Trash2,
 } from "lucide-react";
 import {
   useUsers, ROLE_COLORS, ROLE_PERMISSIONS,
@@ -425,6 +425,52 @@ function ResetPasswordModal({ employee, onClose, onSave }: {
   );
 }
 
+// ─── Delete employee modal ───────────────────────────────────────────────────
+
+function DeleteEmployeeModal({ employee, onClose, onConfirm }: {
+  employee: Employee; onClose: () => void; onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" dir="rtl">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <ModalHeader
+          title="حذف موظف"
+          icon={<Trash2 className="w-5 h-5" />}
+          onClose={onClose}
+        />
+        <div className="p-6 space-y-4">
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            هل تريد حذف حساب الموظف <span className="font-bold">«{employee.name}»</span>؟
+          </div>
+          <div className="bg-muted/40 rounded-xl px-4 py-3 flex items-center gap-3">
+            <RoleAvatar employee={employee} />
+            <div>
+              <p className="font-semibold text-sm text-foreground">{employee.name}</p>
+              <p className="text-xs text-muted-foreground">@{employee.username} — {employee.role}</p>
+            </div>
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={onConfirm}
+              className="flex-1 bg-red-600 text-white py-2.5 rounded-xl text-sm font-bold hover:bg-red-700 transition-colors"
+            >
+              حذف الموظف
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 bg-muted text-foreground py-2.5 rounded-xl text-sm font-semibold hover:bg-muted/80 transition-colors"
+            >
+              إلغاء
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Role avatar ──────────────────────────────────────────────────────────────
 
 function RoleAvatar({ employee }: { employee: Employee }) {
@@ -444,11 +490,12 @@ function RoleAvatar({ employee }: { employee: Employee }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Users() {
-  const { employees, currentUser, isAdmin, login, logout, addEmployee, updateEmployee, resetPassword, toggleStatus } = useUsers();
+  const { employees, currentUser, isAdmin, login, logout, addEmployee, updateEmployee, deleteEmployee, resetPassword, toggleStatus } = useUsers();
 
   const [showAdd, setShowAdd] = useState(false);
   const [editTarget, setEditTarget] = useState<Employee | null>(null);
   const [resetTarget, setResetTarget] = useState<Employee | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
 
   const stats = useMemo(() => ({
     total: employees.length,
@@ -463,6 +510,8 @@ export default function Users() {
   if (!isAdmin) {
     return <AccessDenied currentUser={currentUser} onLogout={logout} />;
   }
+
+  const canDeleteEmployees = currentUser.username === "mohamd";
 
   // ── Admin view ────────────────────────────────────────────────────────────
   return (
@@ -610,6 +659,15 @@ export default function Users() {
                           <KeyRound className="w-3.5 h-3.5" />
                           كلمة المرور
                         </button>
+
+                        {/* Delete — owner only */}
+                        {canDeleteEmployees && emp.id !== currentUser.id && (
+                          <button onClick={() => setDeleteTarget(emp)}
+                            className="flex items-center gap-1 text-xs bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 px-2 py-1.5 rounded-lg transition-colors font-medium">
+                            <Trash2 className="w-3.5 h-3.5" />
+                            حذف
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -657,6 +715,17 @@ export default function Users() {
           onClose={() => setResetTarget(null)}
           onSave={(pw) => {
             resetPassword(resetTarget.id, pw);
+          }}
+        />
+      )}
+
+      {deleteTarget && (
+        <DeleteEmployeeModal
+          employee={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => {
+            deleteEmployee(deleteTarget.id);
+            setDeleteTarget(null);
           }}
         />
       )}
