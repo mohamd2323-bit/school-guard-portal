@@ -25,7 +25,8 @@ export default function SchoolProfile({ school, guards, onClose }: Props) {
 
   const linkedPeople = guards.filter((g) => g.schoolId === school.id);
   const linkedGuards = linkedPeople.filter((g) => g.gender === "ذكر");
-  const linkedSchoolUsers = linkedPeople.filter((g) => g.gender !== "ذكر");
+  const canHaveSchoolUsers = school.type === "بنات" || school.type === "مختلط";
+  const linkedSchoolUsers = canHaveSchoolUsers ? linkedPeople.filter((g) => g.gender !== "ذكر") : [];
 
   function handleCopy() {
     const lines: string[] = [
@@ -58,19 +59,21 @@ export default function SchoolProfile({ school, guards, onClose }: Props) {
       });
     }
 
-    lines.push("");
-    lines.push(`── المستخدمات بالمدرسة (${linkedSchoolUsers.length}) ──`);
-    if (linkedSchoolUsers.length === 0) {
-      lines.push("لا توجد مستخدمات مرتبطات بهذه المدرسة");
-    } else {
-      linkedSchoolUsers.forEach((g, i) => {
-        lines.push(`${i + 1}. ${g.name}`);
-        lines.push(`   السجل المدني: ${g.nationalId}`);
-        lines.push(`   الجوال: ${g.phone || "—"}`);
-        lines.push(`   المسمى الوظيفي: ${g.jobTitle || g.jobType || "—"}`);
-        lines.push(`   الحالة: ${g.status}`);
-        if (i < linkedSchoolUsers.length - 1) lines.push("");
-      });
+    if (canHaveSchoolUsers) {
+      lines.push("");
+      lines.push(`── المستخدمات بالمدرسة (${linkedSchoolUsers.length}) ──`);
+      if (linkedSchoolUsers.length === 0) {
+        lines.push("لا توجد مستخدمات مرتبطات بهذه المدرسة");
+      } else {
+        linkedSchoolUsers.forEach((g, i) => {
+          lines.push(`${i + 1}. ${g.name}`);
+          lines.push(`   السجل المدني: ${g.nationalId}`);
+          lines.push(`   الجوال: ${g.phone || "—"}`);
+          lines.push(`   المسمى الوظيفي: ${g.jobTitle || g.jobType || "—"}`);
+          lines.push(`   الحالة: ${g.status}`);
+          if (i < linkedSchoolUsers.length - 1) lines.push("");
+        });
+      }
     }
 
     lines.push("");
@@ -115,6 +118,26 @@ export default function SchoolProfile({ school, guards, onClose }: Props) {
               </tr>`
             )
             .join("");
+
+    const schoolUsersSection = canHaveSchoolUsers
+      ? `
+        <div class="section-title">
+          المستخدمات بالمدرسة
+          <span class="guard-count">${linkedSchoolUsers.length} مستخدمة</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>اسم المستخدمة</th>
+              <th>السجل المدني</th>
+              <th>رقم الجوال</th>
+              <th>المسمى الوظيفي</th>
+              <th>الحالة</th>
+            </tr>
+          </thead>
+          <tbody>${userRows}</tbody>
+        </table>`
+      : "";
 
     const html = `
       <!DOCTYPE html>
@@ -188,22 +211,7 @@ export default function SchoolProfile({ school, guards, onClose }: Props) {
           <tbody>${guardRows}</tbody>
         </table>
 
-        <div class="section-title">
-          المستخدمات بالمدرسة
-          <span class="guard-count">${linkedSchoolUsers.length} مستخدمة</span>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>اسم المستخدمة</th>
-              <th>السجل المدني</th>
-              <th>رقم الجوال</th>
-              <th>المسمى الوظيفي</th>
-              <th>الحالة</th>
-            </tr>
-          </thead>
-          <tbody>${userRows}</tbody>
-        </table>
+        ${schoolUsersSection}
 
         <div class="footer">
           <span>نظام إدارة الحراسات المدرسية — تعليم عسير</span>
@@ -352,66 +360,68 @@ export default function SchoolProfile({ school, guards, onClose }: Props) {
           </section>
 
           {/* School users */}
-          <section>
-            <div className="flex items-center gap-2 mb-3">
-              <Users className="w-4 h-4 text-pink-600" />
-              <h3 className="font-bold text-sm text-foreground">المستخدمات بالمدرسة</h3>
-              <span
-                className={`text-xs px-2.5 py-0.5 rounded-full font-semibold
-                  ${linkedSchoolUsers.length > 0 ? "bg-pink-100 text-pink-700" : "bg-muted text-muted-foreground"}`}
-              >
-                {linkedSchoolUsers.length} مستخدمة
-              </span>
-            </div>
+          {canHaveSchoolUsers && (
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="w-4 h-4 text-pink-600" />
+                <h3 className="font-bold text-sm text-foreground">المستخدمات بالمدرسة</h3>
+                <span
+                  className={`text-xs px-2.5 py-0.5 rounded-full font-semibold
+                    ${linkedSchoolUsers.length > 0 ? "bg-pink-100 text-pink-700" : "bg-muted text-muted-foreground"}`}
+                >
+                  {linkedSchoolUsers.length} مستخدمة
+                </span>
+              </div>
 
-            {linkedSchoolUsers.length === 0 ? (
-              <div className="bg-muted/40 rounded-xl px-4 py-6 text-center">
-                <Users className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-40" />
-                <p className="text-muted-foreground text-sm font-medium">
-                  لا توجد مستخدمات مرتبطات بهذه المدرسة
-                </p>
-              </div>
-            ) : (
-              <div className="bg-white border border-border rounded-xl overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>#</th>
-                        <th>اسم المستخدمة</th>
-                        <th>السجل المدني</th>
-                        <th>رقم الجوال</th>
-                        <th>المسمى الوظيفي</th>
-                        <th>الحالة</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {linkedSchoolUsers.map((g, i) => (
-                        <tr key={g.id}>
-                          <td className="text-muted-foreground text-xs w-8">{i + 1}</td>
-                          <td className="font-medium text-foreground">{g.name}</td>
-                          <td className="font-mono text-sm">{g.nationalId}</td>
-                          <td className="font-mono text-sm" dir="ltr">{g.phone || "—"}</td>
-                          <td className="text-sm">{g.jobTitle || g.jobType || "—"}</td>
-                          <td>
-                            <span
-                              className={`badge ${
-                                g.status === "نشط"
-                                  ? "bg-green-100 text-green-800"
-                                  : "bg-gray-100 text-gray-600"
-                              }`}
-                            >
-                              {g.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              {linkedSchoolUsers.length === 0 ? (
+                <div className="bg-muted/40 rounded-xl px-4 py-6 text-center">
+                  <Users className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-40" />
+                  <p className="text-muted-foreground text-sm font-medium">
+                    لا توجد مستخدمات مرتبطات بهذه المدرسة
+                  </p>
                 </div>
-              </div>
-            )}
-          </section>
+              ) : (
+                <div className="bg-white border border-border rounded-xl overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>اسم المستخدمة</th>
+                          <th>السجل المدني</th>
+                          <th>رقم الجوال</th>
+                          <th>المسمى الوظيفي</th>
+                          <th>الحالة</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {linkedSchoolUsers.map((g, i) => (
+                          <tr key={g.id}>
+                            <td className="text-muted-foreground text-xs w-8">{i + 1}</td>
+                            <td className="font-medium text-foreground">{g.name}</td>
+                            <td className="font-mono text-sm">{g.nationalId}</td>
+                            <td className="font-mono text-sm" dir="ltr">{g.phone || "—"}</td>
+                            <td className="text-sm">{g.jobTitle || g.jobType || "—"}</td>
+                            <td>
+                              <span
+                                className={`badge ${
+                                  g.status === "نشط"
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-gray-100 text-gray-600"
+                                }`}
+                              >
+                                {g.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
         </div>
 
         {/* Footer buttons */}
