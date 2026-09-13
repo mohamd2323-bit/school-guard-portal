@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type {
   Guard,
+  Gatekeeper,
   School,
   Need,
   NeedStatus,
@@ -35,6 +36,7 @@ export interface BackupSnapshot {
 
 const EMPTY_DATA: AppData = {
   guards: [],
+  gatekeepers: [],
   schools: [],
   needs: [],
   tickets: [],
@@ -67,6 +69,7 @@ async function loadDataFromApi(): Promise<AppData> {
   const json = await apiGet<Partial<AppData>>("/api/appdata", {});
   return {
     guards: json.guards ?? [],
+    gatekeepers: json.gatekeepers ?? [],
     schools: json.schools ?? [],
     needs: json.needs ?? [],
     tickets: json.tickets ?? [],
@@ -241,6 +244,7 @@ export function restoreBackupSnapshot(index = 0): boolean {
   if (!snapshot) return false;
   sharedData = {
     guards: snapshot.data.guards ?? [],
+    gatekeepers: snapshot.data.gatekeepers ?? [],
     schools: snapshot.data.schools ?? [],
     needs: snapshot.data.needs ?? [],
     tickets: snapshot.data.tickets ?? [],
@@ -341,6 +345,7 @@ export function useStore() {
     setData({
       ...sharedData,
       guards: sharedData.guards.filter((g) => g.isDemo),
+      gatekeepers: [],
       schools: sharedData.schools.filter((s) => s.isDemo),
     });
   }, [setData]);
@@ -525,6 +530,47 @@ export function useStore() {
     [setData]
   );
 
+  // ── Gatekeepers ───────────────────────────────────────────────────────────
+  const addGatekeeper = useCallback(
+    (gatekeeper: Gatekeeper, op: Operation) =>
+      setData({
+        ...sharedData,
+        gatekeepers: [gatekeeper, ...sharedData.gatekeepers],
+        operations: [op, ...sharedData.operations],
+      }),
+    [setData]
+  );
+
+  const importGatekeepers = useCallback(
+    (gatekeepers: Gatekeeper[], ops: Operation[]) =>
+      setData({
+        ...sharedData,
+        gatekeepers: [...gatekeepers, ...sharedData.gatekeepers],
+        operations: [...ops, ...sharedData.operations],
+      }),
+    [setData]
+  );
+
+  const updateGatekeeper = useCallback(
+    (id: string, patch: Partial<Gatekeeper>, op: Operation) =>
+      setData({
+        ...sharedData,
+        gatekeepers: sharedData.gatekeepers.map((g) => (g.id === id ? { ...g, ...patch, updatedAt: new Date().toISOString() } : g)),
+        operations: [op, ...sharedData.operations],
+      }),
+    [setData]
+  );
+
+  const deleteGatekeeper = useCallback(
+    (id: string, op: Operation) =>
+      setData({
+        ...sharedData,
+        gatekeepers: sharedData.gatekeepers.filter((g) => g.id !== id),
+        operations: [op, ...sharedData.operations],
+      }),
+    [setData]
+  );
+
   // ── Schools CRUD ───────────────────────────────────────────────────────────
   const addSchool = useCallback(
     (school: School) =>
@@ -569,6 +615,7 @@ export function useStore() {
         guards: sharedData.guards.map((g) =>
           g.schoolId === id ? { ...g, schoolId: null, schoolName: null } : g
         ),
+        gatekeepers: sharedData.gatekeepers.filter((g) => g.schoolId !== id),
         operations: logOp
           ? [logOp, ...sharedData.operations]
           : sharedData.operations,
@@ -597,10 +644,13 @@ export function useStore() {
   const hasDemoData =
     sharedData.guards.some((g) => g.isDemo) || sharedData.schools.some((s) => s.isDemo);
   const hasRealData =
-    sharedData.guards.some((g) => !g.isDemo) || sharedData.schools.some((s) => !s.isDemo);
+    sharedData.guards.some((g) => !g.isDemo) ||
+    sharedData.gatekeepers.length > 0 ||
+    sharedData.schools.some((s) => !s.isDemo);
 
   return {
     guards: sharedData.guards,
+    gatekeepers: sharedData.gatekeepers,
     schools: sharedData.schools,
     needs: sharedData.needs,
     tickets: sharedData.tickets,
@@ -626,6 +676,10 @@ export function useStore() {
     addGuard,
     deleteGuard,
     updateGuard,
+    addGatekeeper,
+    importGatekeepers,
+    updateGatekeeper,
+    deleteGatekeeper,
     addSchool,
     updateSchool,
     deleteSchool,
@@ -634,6 +688,6 @@ export function useStore() {
     deleteViolation,
     hasDemoData,
     hasRealData,
-    hasData: sharedData.guards.length > 0 || sharedData.schools.length > 0,
+    hasData: sharedData.guards.length > 0 || sharedData.gatekeepers.length > 0 || sharedData.schools.length > 0,
   };
 }

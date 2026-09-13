@@ -91,35 +91,43 @@ function makeOp(
 
 const OP_COLORS: Record<OperationType, string> = {
   "نقل حارس":     "bg-indigo-100 text-indigo-800",
+  "نقل بواب":     "bg-blue-100 text-blue-800",
   "إضافة حارس":   "bg-green-100 text-green-800",
+  "إضافة بواب":   "bg-emerald-100 text-emerald-800",
   "تكليف حارس":   "bg-amber-100 text-amber-800",
   "بدل حارس":     "bg-teal-100 text-teal-800",
   "تعديل بيانات": "bg-purple-100 text-purple-800",
+  "تعديل بيانات بواب": "bg-cyan-100 text-cyan-800",
   "إلغاء تكليف":  "bg-rose-100 text-rose-800",
   "إنهاء نقل":    "bg-orange-100 text-orange-800",
   "إنهاء تكليف":  "bg-red-100 text-red-800",
   "حذف مدرسة":    "bg-red-100 text-red-800",
   "حذف حارس":    "bg-red-100 text-red-800",
+  "حذف بواب":    "bg-red-100 text-red-800",
   "أخرى":         "bg-gray-100 text-gray-700",
 };
 
 const OP_ICON: Record<OperationType, React.ReactNode> = {
   "نقل حارس":     <ArrowLeftRight className="w-3 h-3" />,
+  "نقل بواب":     <ArrowLeftRight className="w-3 h-3" />,
   "إضافة حارس":   <UserPlus className="w-3 h-3" />,
+  "إضافة بواب":   <UserPlus className="w-3 h-3" />,
   "تكليف حارس":   <Briefcase className="w-3 h-3" />,
   "بدل حارس":     <Wallet className="w-3 h-3" />,
   "تعديل بيانات": <Pencil className="w-3 h-3" />,
+  "تعديل بيانات بواب": <Pencil className="w-3 h-3" />,
   "إلغاء تكليف":  <X className="w-3 h-3" />,
   "إنهاء نقل":    <ArrowLeftRight className="w-3 h-3" />,
   "إنهاء تكليف":  <Ban className="w-3 h-3" />,
   "حذف مدرسة":    <Trash2 className="w-3 h-3" />,
   "حذف حارس":    <Trash2 className="w-3 h-3" />,
+  "حذف بواب":    <Trash2 className="w-3 h-3" />,
   "أخرى":         <Settings2 className="w-3 h-3" />,
 };
 
 const ALL_OP_TYPES: OperationType[] = [
-  "نقل حارس", "تكليف حارس", "بدل حارس", "تعديل بيانات",
-  "إضافة حارس", "إلغاء تكليف", "إنهاء نقل", "إنهاء تكليف", "حذف مدرسة", "أخرى",
+  "نقل حارس", "نقل بواب", "تكليف حارس", "بدل حارس", "تعديل بيانات", "تعديل بيانات بواب",
+  "إضافة حارس", "إضافة بواب", "إلغاء تكليف", "إنهاء نقل", "إنهاء تكليف", "حذف مدرسة", "حذف بواب", "أخرى",
 ];
 
 function opSummary(op: Operation): string {
@@ -127,10 +135,18 @@ function opSummary(op: Operation): string {
   switch (op.type) {
     case "نقل حارس":
       return `من "${d.fromSchoolName || "—"}" إلى "${d.toSchoolName || "—"}"`;
+    case "نقل بواب":
+      return `نقل بواب من "${d.fromSchoolName || "—"}" إلى "${d.toSchoolName || "—"}"`;
     case "إنهاء نقل":
       return `إنهاء نقل من "${d.fromSchoolName || "—"}" إلى "${d.toSchoolName || "—"}"`;
     case "إضافة حارس":
       return `مدرسة: ${d.schoolName || "—"} — محافظة: ${d.governorate || "—"}`;
+    case "إضافة بواب":
+      return `مدرسة: ${d.toSchoolName || d.schoolName || "—"}`;
+    case "تعديل بيانات بواب":
+      return d.summary || "تعديل بيانات البواب";
+    case "حذف بواب":
+      return d.summary || "حذف بيانات البواب";
     case "تكليف حارس":
       return `${d.entity || "—"} (${d.startDate || ""}–${d.endDate || ""})`;
     case "إلغاء تكليف":

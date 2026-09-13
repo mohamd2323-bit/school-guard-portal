@@ -1,10 +1,11 @@
-import { X, School, UserCheck, ShieldCheck, Printer, Copy, Check, Users } from "lucide-react";
+import { X, School, UserCheck, ShieldCheck, Printer, Copy, Check, Users, Building2 } from "lucide-react";
 import { useState } from "react";
-import type { School as SchoolType, Guard } from "../types";
+import type { School as SchoolType, Guard, Gatekeeper } from "../types";
 
 interface Props {
   school: SchoolType;
   guards: Guard[];
+  gatekeepers: Gatekeeper[];
   onClose: () => void;
 }
 
@@ -20,13 +21,14 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
   );
 }
 
-export default function SchoolProfile({ school, guards, onClose }: Props) {
+export default function SchoolProfile({ school, guards, gatekeepers, onClose }: Props) {
   const [copied, setCopied] = useState(false);
 
   const linkedPeople = guards.filter((g) => g.schoolId === school.id);
   const linkedGuards = linkedPeople.filter((g) => g.gender === "ذكر");
   const canHaveSchoolUsers = school.type === "بنات" || school.type === "مختلط";
   const linkedSchoolUsers = canHaveSchoolUsers ? linkedPeople.filter((g) => g.gender !== "ذكر") : [];
+  const linkedGatekeepers = gatekeepers.filter((gatekeeper) => gatekeeper.schoolId === school.id);
 
   function handleCopy() {
     const lines: string[] = [
@@ -74,6 +76,22 @@ export default function SchoolProfile({ school, guards, onClose }: Props) {
           if (i < linkedSchoolUsers.length - 1) lines.push("");
         });
       }
+    }
+
+    lines.push("");
+    lines.push(`── البوابون التابعون للشركة (${linkedGatekeepers.length}) ──`);
+    if (linkedGatekeepers.length === 0) {
+      lines.push("لا يوجد بوابون مرتبطون بهذه المدرسة");
+    } else {
+      linkedGatekeepers.forEach((gatekeeper, i) => {
+        lines.push(`${i + 1}. ${gatekeeper.name}`);
+        lines.push(`   رقم الهوية: ${gatekeeper.nationalId}`);
+        lines.push(`   الجوال: ${gatekeeper.phone || "—"}`);
+        lines.push(`   الشركة المشغلة: ${gatekeeper.company || "—"}`);
+        lines.push(`   الحالة: ${gatekeeper.status}`);
+        lines.push(`   تاريخ المباشرة: ${gatekeeper.startDate || "—"}`);
+        if (i < linkedGatekeepers.length - 1) lines.push("");
+      });
     }
 
     lines.push("");
@@ -138,6 +156,23 @@ export default function SchoolProfile({ school, guards, onClose }: Props) {
           <tbody>${userRows}</tbody>
         </table>`
       : "";
+
+    const gatekeeperRows =
+      linkedGatekeepers.length === 0
+        ? `<tr><td colspan="6" style="text-align:center;color:#888;padding:16px;">لا يوجد بوابون مرتبطون بهذه المدرسة</td></tr>`
+        : linkedGatekeepers
+            .map(
+              (gatekeeper) => `
+              <tr>
+                <td>${gatekeeper.name}</td>
+                <td>${gatekeeper.nationalId}</td>
+                <td>${gatekeeper.phone || "—"}</td>
+                <td>${gatekeeper.company || "—"}</td>
+                <td>${gatekeeper.status}</td>
+                <td>${gatekeeper.startDate || "—"}</td>
+              </tr>`
+            )
+            .join("");
 
     const html = `
       <!DOCTYPE html>
@@ -212,6 +247,24 @@ export default function SchoolProfile({ school, guards, onClose }: Props) {
         </table>
 
         ${schoolUsersSection}
+
+        <div class="section-title">
+          البوابون التابعون للشركة
+          <span class="guard-count">${linkedGatekeepers.length} بواب</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>اسم البواب</th>
+              <th>رقم الهوية</th>
+              <th>رقم الجوال</th>
+              <th>الشركة المشغلة</th>
+              <th>الحالة</th>
+              <th>تاريخ المباشرة</th>
+            </tr>
+          </thead>
+          <tbody>${gatekeeperRows}</tbody>
+        </table>
 
         <div class="footer">
           <span>نظام إدارة الحراسات المدرسية — تعليم عسير</span>
@@ -422,6 +475,64 @@ export default function SchoolProfile({ school, guards, onClose }: Props) {
               )}
             </section>
           )}
+
+          {/* Gatekeepers */}
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <Building2 className="w-4 h-4 text-blue-600" />
+              <h3 className="font-bold text-sm text-foreground">البوابون التابعون للشركة</h3>
+              <span
+                className={`text-xs px-2.5 py-0.5 rounded-full font-semibold
+                  ${linkedGatekeepers.length > 0 ? "bg-blue-100 text-blue-700" : "bg-muted text-muted-foreground"}`}
+              >
+                {linkedGatekeepers.length} بواب
+              </span>
+            </div>
+
+            {linkedGatekeepers.length === 0 ? (
+              <div className="bg-muted/40 rounded-xl px-4 py-6 text-center">
+                <Building2 className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-40" />
+                <p className="text-muted-foreground text-sm font-medium">
+                  لا يوجد بوابون مرتبطون بهذه المدرسة
+                </p>
+              </div>
+            ) : (
+              <div className="bg-white border border-border rounded-xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>اسم البواب</th>
+                        <th>رقم الهوية</th>
+                        <th>رقم الجوال</th>
+                        <th>الشركة المشغلة</th>
+                        <th>الحالة</th>
+                        <th>تاريخ المباشرة</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {linkedGatekeepers.map((gatekeeper, i) => (
+                        <tr key={gatekeeper.id}>
+                          <td className="text-muted-foreground text-xs w-8">{i + 1}</td>
+                          <td className="font-medium text-foreground">{gatekeeper.name}</td>
+                          <td className="font-mono text-sm">{gatekeeper.nationalId}</td>
+                          <td className="font-mono text-sm" dir="ltr">{gatekeeper.phone || "—"}</td>
+                          <td className="text-sm">{gatekeeper.company || "—"}</td>
+                          <td>
+                            <span className={`badge ${gatekeeper.status === "على رأس العمل" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-700"}`}>
+                              {gatekeeper.status}
+                            </span>
+                          </td>
+                          <td className="text-sm">{gatekeeper.startDate || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </section>
         </div>
 
         {/* Footer buttons */}

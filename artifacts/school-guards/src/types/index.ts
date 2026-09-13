@@ -30,6 +30,23 @@ export interface Guard {
   previousSchoolName?: string | null;
 }
 
+export type GatekeeperStatus = "على رأس العمل" | "منقول" | "منقطع" | "منتهي العقد" | "غير نشط";
+
+export interface Gatekeeper {
+  id: string;
+  name: string;
+  nationalId: string;
+  phone: string;
+  gender: "ذكر" | "أنثى";
+  company: string;
+  schoolId: string;
+  status: GatekeeperStatus;
+  startDate: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export type NeedStatus = "جديد" | "تحت الإجراء" | "تم التغطية" | "مغلق";
 export type NeedType = "حارس" | "حارسة";
 
@@ -84,15 +101,19 @@ export interface Ticket {
 
 export type OperationType =
   | "نقل حارس"
+  | "نقل بواب"
   | "إضافة حارس"
+  | "إضافة بواب"
   | "تكليف حارس"
   | "بدل حارس"
   | "تعديل بيانات"
+  | "تعديل بيانات بواب"
   | "إلغاء تكليف"
   | "إنهاء نقل"
   | "إنهاء تكليف"
   | "حذف مدرسة"
   | "حذف حارس"
+  | "حذف بواب"
   | "أخرى";
 
 export interface Operation {
@@ -146,6 +167,7 @@ export interface ImportSummary {
 
 export interface AppData {
   guards: Guard[];
+  gatekeepers: Gatekeeper[];
   schools: School[];
   needs: Need[];
   tickets: Ticket[];

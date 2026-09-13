@@ -3,6 +3,7 @@ import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Guards from "./pages/Guards";
+import Gatekeepers from "./pages/Gatekeepers";
 import Schools from "./pages/Schools";
 import DataManagement from "./pages/DataManagement";
 import Needs from "./pages/Needs";
@@ -21,6 +22,7 @@ const DEFAULT_PAGE_TITLE = "وزارة التعليم | بوابة الحراس�
 const PAGE_TITLES: Record<string, string> = {
   "/": "وزارة التعليم | لوحة التحكم",
   "/guards": "وزارة التعليم | إدارة الحراس",
+  "/gatekeepers": "وزارة التعليم | إدارة البوابين",
   "/schools": "وزارة التعليم | إدارة المدارس",
   "/operations": "وزارة التعليم | العمليات",
   "/needs": "وزارة التعليم | الاحتياج",
@@ -73,6 +75,7 @@ function Router() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/guards" component={Guards} />
+        <Route path="/gatekeepers" component={Gatekeepers} />
         <Route path="/schools" component={Schools} />
         <Route path="/needs" component={Needs} />
         <Route path="/operations" component={Operations} />

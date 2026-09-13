@@ -29,29 +29,37 @@ function InfoRow({ label, value, fallback = "—" }: {
 
 const OP_ICONS: Record<OperationType, React.ReactNode> = {
   "نقل حارس": <ArrowLeftRight className="w-3.5 h-3.5" />,
+  "نقل بواب": <ArrowLeftRight className="w-3.5 h-3.5" />,
   "إضافة حارس": <UserPlus className="w-3.5 h-3.5" />,
+  "إضافة بواب": <UserPlus className="w-3.5 h-3.5" />,
   "تكليف حارس": <Briefcase className="w-3.5 h-3.5" />,
   "بدل حارس": <Wallet className="w-3.5 h-3.5" />,
   "تعديل بيانات": <Pencil className="w-3.5 h-3.5" />,
+  "تعديل بيانات بواب": <Pencil className="w-3.5 h-3.5" />,
   "إلغاء تكليف": <X className="w-3.5 h-3.5" />,
   "إنهاء نقل": <ArrowLeftRight className="w-3.5 h-3.5" />,
   "إنهاء تكليف": <X className="w-3.5 h-3.5" />,
   "حذف مدرسة": <Trash2 className="w-3.5 h-3.5" />,
   "حذف حارس": <Trash2 className="w-3.5 h-3.5" />,
+  "حذف بواب": <Trash2 className="w-3.5 h-3.5" />,
   "أخرى": <Settings2 className="w-3.5 h-3.5" />,
 };
 
 const OP_COLORS: Record<OperationType, string> = {
   "نقل حارس": "bg-indigo-50 text-indigo-700",
+  "نقل بواب": "bg-blue-50 text-blue-700",
   "إضافة حارس": "bg-green-50 text-green-700",
+  "إضافة بواب": "bg-emerald-50 text-emerald-700",
   "تكليف حارس": "bg-amber-50 text-amber-700",
   "بدل حارس": "bg-teal-50 text-teal-700",
   "تعديل بيانات": "bg-purple-50 text-purple-700",
+  "تعديل بيانات بواب": "bg-cyan-50 text-cyan-700",
   "إلغاء تكليف": "bg-rose-50 text-rose-700",
   "إنهاء نقل": "bg-orange-50 text-orange-700",
   "إنهاء تكليف": "bg-red-50 text-red-700",
   "حذف مدرسة": "bg-red-50 text-red-700",
   "حذف حارس": "bg-red-50 text-red-700",
+  "حذف بواب": "bg-red-50 text-red-700",
   "أخرى": "bg-gray-50 text-gray-600",
 };
 

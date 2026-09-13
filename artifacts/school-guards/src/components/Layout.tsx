@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   ClipboardList,
   Database,
+  DoorOpen,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -32,6 +33,7 @@ const navGroups = [
     label: "السجلات",
     items: [
       { href: "/guards", label: "إدارة الحراس", icon: ShieldCheck },
+      { href: "/gatekeepers", label: "إدارة البوابين", icon: DoorOpen },
       { href: "/schools", label: "إدارة المدارس", icon: School },
     ],
   },

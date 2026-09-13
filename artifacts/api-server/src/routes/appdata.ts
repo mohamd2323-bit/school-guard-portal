@@ -9,6 +9,7 @@ const router: IRouter = Router();
 
 const APP_COLLECTIONS = [
   "guards",
+  "gatekeepers",
   "schools",
   "needs",
   "tickets",
@@ -162,6 +163,10 @@ router.put("/appdata", async (req, res) => {
 
     await Promise.all(
       APP_COLLECTIONS.map((collection) => {
+        if (!Object.prototype.hasOwnProperty.call(body, collection)) {
+          return Promise.resolve();
+        }
+
         const value = body[collection];
 
         return setCollection(

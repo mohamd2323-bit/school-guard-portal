@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { useStore, useBackups, saveBackupSnapshot, restoreBackupSnapshot, deleteBackupSnapshot } from "../store/useStore";
-import type { Guard, School, ImportSummary } from "../types";
+import type { Gatekeeper, Guard, School, ImportSummary } from "../types";
 import {
   Upload,
   FileSpreadsheet,
@@ -364,7 +364,7 @@ type PendingImport = {
 };
 
 export default function DataManagement() {
-  const { importData, clearData, clearDemoData, loadDemoData, hasData, hasDemoData, hasRealData, guards, schools, needs, operations, violations } = useStore();
+  const { importData, clearData, clearDemoData, loadDemoData, hasData, hasDemoData, hasRealData, guards, gatekeepers, schools, needs, operations, violations } = useStore();
 
   const [mode, setMode] = useState<"single" | "dual">("single");
   const [pending, setPending] = useState<PendingImport | null>(null);
@@ -392,6 +392,7 @@ export default function DataManagement() {
         const parsed = JSON.parse(saved) as Record<string, boolean>;
         return {
           guards: parsed.guards ?? true,
+          gatekeepers: parsed.gatekeepers ?? true,
           schools: parsed.schools ?? true,
           operations: parsed.operations ?? true,
           needs: parsed.needs ?? true,
@@ -401,7 +402,7 @@ export default function DataManagement() {
     } catch {
       /* ignore */
     }
-    return { guards: true, schools: true, operations: true, needs: true, violations: true };
+    return { guards: true, gatekeepers: true, schools: true, operations: true, needs: true, violations: true };
   }
 
   const [exportSheets, setExportSheets] = useState(loadExportSheets);
@@ -424,7 +425,7 @@ export default function DataManagement() {
 
   function toggleAllExportSheets() {
     const allChecked = Object.values(exportSheets).every(Boolean);
-    const next = { guards: !allChecked, schools: !allChecked, operations: !allChecked, needs: !allChecked, violations: !allChecked };
+    const next = { guards: !allChecked, gatekeepers: !allChecked, schools: !allChecked, operations: !allChecked, needs: !allChecked, violations: !allChecked };
     saveExportSheets(next);
     setExportSheets(next);
   }
@@ -461,6 +462,7 @@ export default function DataManagement() {
 
   const hasExportData =
     guards.length > 0 ||
+    gatekeepers.length > 0 ||
     schools.length > 0 ||
     operations.length > 0 ||
     needs.length > 0 ||
@@ -490,6 +492,29 @@ export default function DataManagement() {
         "اسم المدرسة المرتبطة": g.schoolName ?? "",
       }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(guardsData), "الحراس");
+    }
+
+    if (exportSheets.gatekeepers) {
+      const schoolsById = new Map(schools.map((school) => [school.id, school]));
+      const gatekeepersData = gatekeepers.map((g: Gatekeeper) => {
+        const school = schoolsById.get(g.schoolId);
+        return {
+          "اسم البواب": g.name,
+          "رقم الهوية": g.nationalId,
+          "رقم الجوال": g.phone,
+          "الجنس": g.gender,
+          "الشركة المشغلة": g.company,
+          "الحالة": g.status,
+          "تاريخ المباشرة": g.startDate,
+          "اسم المدرسة": school?.name ?? "",
+          "معرف المدرسة": school?.id ?? "",
+          "المحافظة": school?.governorate ?? "",
+          "المرحلة": school?.level ?? "",
+          "نوع المدرسة": school?.type ?? "",
+          "ملاحظات": g.notes ?? "",
+        };
+      });
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(gatekeepersData), "البوابين");
     }
 
     if (exportSheets.schools) {
@@ -795,6 +820,7 @@ export default function DataManagement() {
               if (!showExportPanel) {
                 setExportSheets({
                   guards: guards.length > 0,
+                  gatekeepers: gatekeepers.length > 0,
                   schools: schools.length > 0,
                   operations: operations.length > 0,
                   needs: needs.length > 0,
@@ -820,6 +846,7 @@ export default function DataManagement() {
             {(
               [
                 { label: "حارس", emptyLabel: "لا يوجد حراس", count: guards.length },
+                { label: "بواب", emptyLabel: "لا يوجد بوابون", count: gatekeepers.length },
                 { label: "مدرسة", emptyLabel: "لا توجد مدارس", count: schools.length },
                 { label: "عملية", emptyLabel: "لا توجد عمليات", count: operations.length },
                 { label: "احتياج", emptyLabel: "لا توجد احتياجات", count: needs.length },
@@ -857,6 +884,7 @@ export default function DataManagement() {
               {(
                 [
                   { key: "guards", label: "الحراس", count: guards.length },
+                  { key: "gatekeepers", label: "البوابين", count: gatekeepers.length },
                   { key: "schools", label: "المدارس", count: schools.length },
                   { key: "operations", label: "العمليات", count: operations.length },
                   { key: "needs", label: "الاحتياجات", count: needs.length },
@@ -959,6 +987,7 @@ export default function DataManagement() {
                           </p>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {formatBackupDate(snap.timestamp)} · {(snap.data.guards?.length ?? 0)} حارس ·{" "}
+                            {(snap.data.gatekeepers?.length ?? 0)} بواب ·{" "}
                             {(snap.data.schools?.length ?? 0)} مدرسة ·{" "}
                             {(snap.data.operations?.length ?? 0)} عملية
                           </p>
@@ -973,6 +1002,7 @@ export default function DataManagement() {
                           </p>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {(snap.data.guards?.length ?? 0)} حارس ·{" "}
+                            {(snap.data.gatekeepers?.length ?? 0)} بواب ·{" "}
                             {(snap.data.schools?.length ?? 0)} مدرسة ·{" "}
                             {(snap.data.operations?.length ?? 0)} عملية
                           </p>

@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import type { Guard, School } from "../types";
+import type { Gatekeeper, Guard, School } from "../types";
 import { buildMaleGuardsBySchool } from "./guardCoverage";
 
 type CellValue = string | number;
@@ -33,6 +33,7 @@ const SCHOOL_HEADERS = [
   "رقم هوية/سجل المدير/ة",
   "جوال المدير/ة",
   "عدد الحراس",
+  "عدد البوابين",
 ];
 
 function asRecord(value: unknown): DataRecord {
@@ -157,8 +158,13 @@ function buildGuardRows(schools: School[], guards: Guard[]) {
   });
 }
 
-function buildSchoolRows(schools: School[], guards: Guard[]) {
+function buildSchoolRows(schools: School[], guards: Guard[], gatekeepers: Gatekeeper[] = []) {
   const guardsBySchool = buildMaleGuardsBySchool(guards);
+  const gatekeepersBySchool = new Map<string, number>();
+  gatekeepers.forEach((gatekeeper) => {
+    if (!gatekeeper.schoolId || gatekeeper.status !== "على رأس العمل") return;
+    gatekeepersBySchool.set(gatekeeper.schoolId, (gatekeepersBySchool.get(gatekeeper.schoolId) ?? 0) + 1);
+  });
 
   return schools.map((school) => {
     const schoolRecord = asRecord(school);
@@ -171,13 +177,14 @@ function buildSchoolRows(schools: School[], guards: Guard[]) {
       firstValue(schoolRecord, ["principalNationalId", "principalCivilId"]),
       firstValue(schoolRecord, ["principalPhone", "principalMobile"]),
       guardsBySchool.get(school.id)?.length ?? 0,
+      gatekeepersBySchool.get(school.id) ?? 0,
     ];
   });
 }
 
-export function buildSchoolsWorkbook(schools: School[], guards: Guard[]) {
+export function buildSchoolsWorkbook(schools: School[], guards: Guard[], gatekeepers: Gatekeeper[] = []) {
   const guardRows = buildGuardRows(schools, guards);
-  const schoolRows = buildSchoolRows(schools, guards);
+  const schoolRows = buildSchoolRows(schools, guards, gatekeepers);
   const wb = XLSX.utils.book_new();
 
   wb.Workbook = {
@@ -197,8 +204,8 @@ export function buildSchoolsWorkbook(schools: School[], guards: Guard[]) {
   };
 }
 
-export function exportSchoolsWorkbook(schools: School[], guards: Guard[]) {
-  const { workbook } = buildSchoolsWorkbook(schools, guards);
+export function exportSchoolsWorkbook(schools: School[], guards: Guard[], gatekeepers: Gatekeeper[] = []) {
+  const { workbook } = buildSchoolsWorkbook(schools, guards, gatekeepers);
   const date = new Date().toISOString().split("T")[0];
   XLSX.writeFile(workbook, `قائمة-الحراس-${date}.xlsx`);
 }

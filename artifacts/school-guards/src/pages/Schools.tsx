@@ -12,7 +12,7 @@ import SchoolProfile from "../components/SchoolProfile";
 import { exportSchoolsWorkbook } from "../lib/schoolsExcelExport";
 import { buildMaleGuardsBySchool } from "../lib/guardCoverage";
 import { displayGovernorate, governorateKey, uniqueGovernorates } from "../lib/governorates";
-import type { School, Guard, Need, NeedType, Operation } from "../types";
+import type { School, Guard, Need, NeedType, Operation, Gatekeeper } from "../types";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
@@ -52,6 +52,7 @@ function googleMapsSchoolUrl(school: School) {
 
 type GuardFilter = "all" | "no-guard" | "has-guard";
 type SchoolUserFilter = "all" | "no-staff" | "has-staff";
+type GatekeeperFilter = "all" | "no-gatekeeper" | "has-gatekeeper";
 
 const SCHOOLS_STORAGE_KEY = "schoolsFilters";
 
@@ -59,21 +60,24 @@ interface SchoolsPersistedState {
   search: string;
   guardFilter: GuardFilter;
   schoolUserFilter: SchoolUserFilter;
+  gatekeeperFilter: GatekeeperFilter;
   governorateFilter: string;
   typeFilter: string;
 }
 
 function initSchoolsState(): SchoolsPersistedState {
   const p = new URLSearchParams(window.location.search);
-  const hasUrlFilters = p.get("guard") || p.get("staff") || p.get("q") || p.get("governorate") || p.get("type");
+  const hasUrlFilters = p.get("guard") || p.get("staff") || p.get("gatekeeper") || p.get("q") || p.get("governorate") || p.get("type");
   if (hasUrlFilters) {
     const v = p.get("guard");
     const staff = p.get("staff");
+    const gatekeeper = p.get("gatekeeper");
     const type = p.get("type") ?? "";
     return {
       search: p.get("q") ?? "",
       guardFilter: v === "no-guard" || v === "has-guard" ? v : "all",
       schoolUserFilter: staff === "no-staff" || staff === "has-staff" ? staff : "all",
+      gatekeeperFilter: gatekeeper === "no-gatekeeper" || gatekeeper === "has-gatekeeper" ? gatekeeper : "all",
       governorateFilter: displayGovernorate(p.get("governorate")),
       typeFilter: type === "بنين" || type === "بنات" || type === "مختلط" ? type : "",
     };
@@ -87,13 +91,14 @@ function initSchoolsState(): SchoolsPersistedState {
           search: stored.search ?? "",
           guardFilter: stored.guardFilter,
           schoolUserFilter: stored.schoolUserFilter ?? "all",
+          gatekeeperFilter: stored.gatekeeperFilter ?? "all",
           governorateFilter: displayGovernorate(stored.governorateFilter),
           typeFilter: stored.typeFilter ?? "",
         };
       }
     }
   } catch {}
-  return { search: "", guardFilter: "all", schoolUserFilter: "all", governorateFilter: "", typeFilter: "" };
+  return { search: "", guardFilter: "all", schoolUserFilter: "all", gatekeeperFilter: "all", governorateFilter: "", typeFilter: "" };
 }
 
 function SchoolFilterSelect({
@@ -608,7 +613,7 @@ type ActionModal = { type: "assign" | "temp" | "need"; school: School };
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Schools() {
-  const { schools, guards, addSchool, updateSchool, deleteSchool } = useStore();
+  const { schools, guards, gatekeepers, addSchool, updateSchool, deleteSchool } = useStore();
   const { currentUser, isAdmin } = useUsers();
   const [, navigate] = useLocation();
 
@@ -616,26 +621,28 @@ export default function Schools() {
   const [search, setSearch] = useState(initialState.search);
   const [guardFilter, setGuardFilter] = useState<GuardFilter>(initialState.guardFilter);
   const [schoolUserFilter, setSchoolUserFilter] = useState<SchoolUserFilter>(initialState.schoolUserFilter);
+  const [gatekeeperFilter, setGatekeeperFilter] = useState<GatekeeperFilter>(initialState.gatekeeperFilter);
   const [governorateFilter, setGovernorateFilter] = useState(initialState.governorateFilter);
   const [typeFilter, setTypeFilter] = useState(initialState.typeFilter);
   const tableScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const state: SchoolsPersistedState = { search, guardFilter, schoolUserFilter, governorateFilter, typeFilter };
+    const state: SchoolsPersistedState = { search, guardFilter, schoolUserFilter, gatekeeperFilter, governorateFilter, typeFilter };
     try { sessionStorage.setItem(SCHOOLS_STORAGE_KEY, JSON.stringify(state)); } catch {}
     const p = new URLSearchParams();
     if (search) p.set("q", search);
     if (guardFilter !== "all") p.set("guard", guardFilter);
     if (schoolUserFilter !== "all") p.set("staff", schoolUserFilter);
+    if (gatekeeperFilter !== "all") p.set("gatekeeper", gatekeeperFilter);
     if (governorateFilter) p.set("governorate", governorateFilter);
     if (typeFilter) p.set("type", typeFilter);
     const qs = p.toString();
     navigate("/schools" + (qs ? "?" + qs : ""), { replace: true });
-  }, [guardFilter, schoolUserFilter, governorateFilter, search, typeFilter, navigate]);
+  }, [gatekeeperFilter, guardFilter, schoolUserFilter, governorateFilter, search, typeFilter, navigate]);
 
   useEffect(() => {
     if (tableScrollRef.current) tableScrollRef.current.scrollTop = 0;
-  }, [governorateFilter, guardFilter, schoolUserFilter, search, typeFilter]);
+  }, [gatekeeperFilter, governorateFilter, guardFilter, schoolUserFilter, search, typeFilter]);
 
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [actionModal, setActionModal] = useState<ActionModal | null>(null);
@@ -672,9 +679,34 @@ export default function Schools() {
     return counts;
   }, [guards, schools]);
 
+  const gatekeeperCountMap = useMemo(() => {
+    const counts = new Map<string, number>();
+    gatekeepers.forEach((gatekeeper: Gatekeeper) => {
+      if (!gatekeeper.schoolId || gatekeeper.status !== "على رأس العمل") return;
+      counts.set(gatekeeper.schoolId, (counts.get(gatekeeper.schoolId) ?? 0) + 1);
+    });
+    return counts;
+  }, [gatekeepers]);
+
+  const gatekeepersBySchool = useMemo(() => {
+    const grouped = new Map<string, Gatekeeper[]>();
+    gatekeepers.forEach((gatekeeper: Gatekeeper) => {
+      if (!gatekeeper.schoolId) return;
+      const list = grouped.get(gatekeeper.schoolId) ?? [];
+      list.push(gatekeeper);
+      grouped.set(gatekeeper.schoolId, list);
+    });
+    return grouped;
+  }, [gatekeepers]);
+
   const schoolUserCount = useMemo(
     () => Array.from(schoolUserCountMap.values()).reduce((total, count) => total + count, 0),
     [schoolUserCountMap]
+  );
+
+  const activeGatekeeperCount = useMemo(
+    () => Array.from(gatekeeperCountMap.values()).reduce((total, count) => total + count, 0),
+    [gatekeeperCountMap]
   );
 
   const eligibleSchoolUserSchools = useMemo(
@@ -700,6 +732,7 @@ export default function Schools() {
   const filtered = useMemo(() => {
     return schools.filter((s) => {
       const hasGuard = guardCountMap.has(s.id);
+      const hasGatekeeper = gatekeeperCountMap.has(s.id);
       const canHaveSchoolUsers = s.type === "بنات" || s.type === "مختلط";
       const hasSchoolUsers = canHaveSchoolUsers && schoolUserCountMap.has(s.id);
       const matchesFilter =
@@ -711,6 +744,10 @@ export default function Schools() {
         (canHaveSchoolUsers &&
           ((schoolUserFilter === "no-staff" && !hasSchoolUsers) ||
             (schoolUserFilter === "has-staff" && hasSchoolUsers)));
+      const matchesGatekeeperFilter =
+        gatekeeperFilter === "all" ||
+        (gatekeeperFilter === "no-gatekeeper" && !hasGatekeeper) ||
+        (gatekeeperFilter === "has-gatekeeper" && hasGatekeeper);
       const matchesGovernorate = !governorateFilter || governorateKey(s.governorate) === governorateKey(governorateFilter);
       const matchesType = !typeFilter || s.type.trim() === typeFilter;
       const q = search.trim();
@@ -719,10 +756,13 @@ export default function Schools() {
         s.governorate.includes(q) ||
         s.level.includes(q) ||
         s.principalName.includes(q) ||
-        s.principalNationalId.includes(q);
-      return matchesFilter && matchesSchoolUserFilter && matchesGovernorate && matchesType && matchesSearch;
+        s.principalNationalId.includes(q) ||
+        (gatekeepersBySchool.get(s.id) ?? []).some((gatekeeper) =>
+          gatekeeper.name.includes(q) || gatekeeper.nationalId.includes(q) || gatekeeper.phone.includes(q)
+        );
+      return matchesFilter && matchesSchoolUserFilter && matchesGatekeeperFilter && matchesGovernorate && matchesType && matchesSearch;
     });
-  }, [schools, guardCountMap, schoolUserCountMap, schoolUserFilter, governorateFilter, guardFilter, search, typeFilter]);
+  }, [schools, guardCountMap, schoolUserCountMap, gatekeeperCountMap, gatekeepersBySchool, gatekeeperFilter, schoolUserFilter, governorateFilter, guardFilter, search, typeFilter]);
 
   const statusOptions = useMemo(() => [
     { value: "no-guard", label: `بدون حارس (${noGuardCount.toLocaleString("ar-SA")})` },
@@ -733,6 +773,11 @@ export default function Schools() {
     { value: "no-staff", label: `بدون حارسات (${noSchoolUserCount.toLocaleString("ar-SA")})` },
     { value: "has-staff", label: `مرتبطة (${(eligibleSchoolUserSchools.length - noSchoolUserCount).toLocaleString("ar-SA")})` },
   ], [eligibleSchoolUserSchools.length, noSchoolUserCount]);
+
+  const gatekeeperStatusOptions = useMemo(() => [
+    { value: "no-gatekeeper", label: `بدون بوابين (${(schools.length - gatekeeperCountMap.size).toLocaleString("ar-SA")})` },
+    { value: "has-gatekeeper", label: `مرتبطة (${gatekeeperCountMap.size.toLocaleString("ar-SA")})` },
+  ], [gatekeeperCountMap.size, schools.length]);
 
   function handleSaveSchool(data: Omit<School, "id" | "isDemo">) {
     if (formModal?.mode === "edit") {
@@ -812,7 +857,7 @@ export default function Schools() {
             />
           </div>
           <button
-            onClick={() => exportSchoolsWorkbook(schools, guards)}
+            onClick={() => exportSchoolsWorkbook(schools, guards, gatekeepers)}
             disabled={schools.length === 0}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-white text-primary border border-primary/30 hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap dark:bg-card"
             title={`تصدير ${schools.length.toLocaleString("ar-SA")} مدرسة إلى Excel`}
@@ -832,12 +877,14 @@ export default function Schools() {
 
       {/* Stats bar */}
       {schools.length > 0 && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
           {[
             { label: "إجمالي المدارس", value: schools.length, color: "bg-white border-border text-foreground" },
             { label: "مدارس بدون حارس", value: noGuardCount, color: noGuardCount > 0 ? "bg-orange-50 border-orange-200 text-orange-800" : "bg-green-50 border-green-200 text-green-800" },
             { label: "مدارس مرتبطة بحارس", value: schools.length - noGuardCount, color: "bg-teal-50 border-teal-200 text-teal-800" },
             { label: "المستخدمات بالمدارس", value: schoolUserCount, color: "bg-pink-50 border-pink-200 text-pink-800" },
+            { label: "إجمالي البوابين", value: activeGatekeeperCount, color: "bg-blue-50 border-blue-200 text-blue-800" },
+            { label: "مدارس مرتبطة ببوابين", value: gatekeeperCountMap.size, color: "bg-cyan-50 border-cyan-200 text-cyan-800" },
           ].map((s) => (
             <div key={s.label} className={`border rounded-xl p-3 text-center ${s.color}`}>
               <p className="text-xl font-bold">{s.value.toLocaleString("ar-SA")}</p>
@@ -895,6 +942,15 @@ export default function Schools() {
                   <th>عدد الحراس</th>
                   <th>
                     <SchoolFilterSelect
+                      label="البوابين"
+                      value={gatekeeperFilter === "all" ? "" : gatekeeperFilter}
+                      options={gatekeeperStatusOptions}
+                      onChange={(value) => setGatekeeperFilter((value || "all") as GatekeeperFilter)}
+                      compact
+                    />
+                  </th>
+                  <th>
+                    <SchoolFilterSelect
                       label="المستخدمات"
                       value={schoolUserFilter === "all" ? "" : schoolUserFilter}
                       options={schoolUserStatusOptions}
@@ -917,6 +973,7 @@ export default function Schools() {
               <tbody>
                 {filtered.map((school) => {
                   const count = guardCountMap.get(school.id) ?? 0;
+                  const gatekeeperCount = gatekeeperCountMap.get(school.id) ?? 0;
                   const canHaveSchoolUsers = school.type === "بنات" || school.type === "مختلط";
                   const userCount = canHaveSchoolUsers ? schoolUserCountMap.get(school.id) ?? 0 : 0;
                   const noGuard = count === 0;
@@ -956,6 +1013,20 @@ export default function Schools() {
                             }`}>
                             <Shield className="w-3 h-3" />
                             {count}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Gatekeeper count */}
+                      <td>
+                        <div className="flex items-center justify-center">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold
+                            ${gatekeeperCount > 0
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-muted text-muted-foreground"
+                            }`}>
+                            <Users className="w-3 h-3" />
+                            {gatekeeperCount}
                           </span>
                         </div>
                       </td>
@@ -1084,7 +1155,7 @@ export default function Schools() {
 
       {/* School profile modal */}
       {selectedSchool && (
-        <SchoolProfile school={selectedSchool} guards={guards} onClose={() => setSelectedSchool(null)} />
+        <SchoolProfile school={selectedSchool} guards={guards} gatekeepers={gatekeepers} onClose={() => setSelectedSchool(null)} />
       )}
 
       {/* Add / Edit school modal */}
