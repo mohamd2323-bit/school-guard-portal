@@ -7,7 +7,33 @@ export interface School {
   principalName: string;
   principalNationalId: string;
   principalPhone: string;
+  ministerialNumber?: string;
+  ministerialRecords?: SchoolMinisterialRecord[];
+  principalEmail?: string;
+  schoolEmail?: string;
+  phone?: string;
+  city?: string;
+  administrativeCenter?: string;
+  address?: string;
+  latitude?: string;
+  longitude?: string;
+  buildingOwnership?: string;
+  sector?: string;
+  sectorDetail?: string;
+  principalDataSource?: "الإكسل" | "البوابة" | "غير متوفر";
+  matchedPortalSchoolName?: string;
   isDemo?: boolean;
+}
+
+export interface SchoolMinisterialRecord {
+  ministerialNumber: string;
+  officialName: string;
+  level: string;
+  authority?: string;
+  educationOffice?: string;
+  gender: "بنين" | "بنات" | "مختلط" | "";
+  schoolType?: string;
+  educationType?: string;
 }
 
 export interface Guard {

@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { useStore, useBackups, saveBackupSnapshot, restoreBackupSnapshot, deleteBackupSnapshot } from "../store/useStore";
-import type { Gatekeeper, Guard, School, ImportSummary } from "../types";
+import type { Gatekeeper, Guard, School, SchoolMinisterialRecord, ImportSummary } from "../types";
 import {
   Upload,
   FileSpreadsheet,
@@ -81,6 +81,31 @@ function pick(row: Record<string, unknown>, colMap: Map<string, string>, ...keyw
   return "";
 }
 
+function splitArabicList(value: string): string[] {
+  return value
+    .split(/[،,|]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseMinisterialRecordsFromRow(row: Record<string, unknown>, colMap: Map<string, string>): SchoolMinisterialRecord[] {
+  const numbers = splitArabicList(pick(row, colMap, "الأرقام الوزارية", "الرقم الوزاري", "ministerial numbers", "ministerial number"));
+  const names = splitArabicList(pick(row, colMap, "أسماء السجلات الوزارية", "اسم المدرسة الوزاري", "اسم المدرسة", "official school names"));
+  const levels = splitArabicList(pick(row, colMap, "المراحل", "المرحلة", "level"));
+  const genders = splitArabicList(pick(row, colMap, "جنس المدرسة", "الجنس"));
+  const schoolTypes = splitArabicList(pick(row, colMap, "نوع المدرسة"));
+  const educationTypes = splitArabicList(pick(row, colMap, "نوع التعليم"));
+
+  return numbers.map((ministerialNumber, index) => ({
+    ministerialNumber,
+    officialName: names[index] ?? names[0] ?? "",
+    level: levels[index] ?? levels[0] ?? "",
+    gender: (genders[index] ?? genders[0] ?? "") as SchoolMinisterialRecord["gender"],
+    schoolType: schoolTypes[index] ?? schoolTypes[0] ?? "",
+    educationType: educationTypes[index] ?? educationTypes[0] ?? "",
+  }));
+}
+
 /** Find a worksheet by matching any keyword (Arabic or English) against sheet names */
 function findSheet(
   wb: XLSX.WorkBook,
@@ -120,7 +145,7 @@ function parseSchools(ws: XLSX.WorkSheet): { schools: School[]; errors: string[]
 
     // School name — look for "مدرسة" or "school" fragment
     const name = pick(row, cm,
-      "اسم المدرسة", "المدرسة", "مدرسة", "school name", "school_name", "school",
+      "اسم العرض المقترح", "اسم المدرسة", "المدرسة", "مدرسة", "school name", "school_name", "school",
     );
     if (!name) {
       errors.push(`مدرسة - الصف ${i + 2}: اسم المدرسة مفقود`);
@@ -132,9 +157,13 @@ function parseSchools(ws: XLSX.WorkSheet): { schools: School[]; errors: string[]
     if (typeRaw.includes("بنات") || typeRaw.toLowerCase().includes("girl")) type = "بنات";
     else if (typeRaw.includes("مختلط") || typeRaw.toLowerCase().includes("mix")) type = "مختلط";
 
+    const ministerialRecords = parseMinisterialRecordsFromRow(row, cm);
+
     schools.push({
       id: generateId(),
       name,
+      ministerialNumber: ministerialRecords[0]?.ministerialNumber || pick(row, cm, "الرقم الوزاري", "ministerial number") || undefined,
+      ministerialRecords: ministerialRecords.length ? ministerialRecords : undefined,
       governorate: pick(row, cm,
         "المحافظة", "محافظة", "governorate", "district",
       ),
@@ -157,6 +186,19 @@ function parseSchools(ws: XLSX.WorkSheet): { schools: School[]; errors: string[]
         "جوال المديرة", "جوال المدير", "رقم جوال المديرة", "رقم جوال المدير",
         "هاتف المدير", "هاتف المديرة", "principal phone", "principal_phone",
       ),
+      principalEmail: pick(row, cm, "بريد المدير/ة", "البريد الإلكتروني لمدير المدرسة", "بريد مدير المدرسة", "principal email") || undefined,
+      schoolEmail: pick(row, cm, "بريد المدرسة", "البريد الإلكتروني", "school email") || undefined,
+      phone: pick(row, cm, "هاتف المدرسة", "الهاتف", "phone") || undefined,
+      city: pick(row, cm, "المدينة/القرية", "المدينة", "city") || undefined,
+      administrativeCenter: pick(row, cm, "المركز الإداري", "administrative center") || undefined,
+      address: pick(row, cm, "العنوان", "address") || undefined,
+      latitude: pick(row, cm, "خط العرض", "latitude") || undefined,
+      longitude: pick(row, cm, "خط الطول", "longitude") || undefined,
+      buildingOwnership: pick(row, cm, "ملكية المبنى", "building ownership") || undefined,
+      sector: pick(row, cm, "القطاع", "sector") || undefined,
+      sectorDetail: pick(row, cm, "تحديد القطاع", "sector detail") || undefined,
+      principalDataSource: (pick(row, cm, "مصدر بيانات المدير") || undefined) as School["principalDataSource"],
+      matchedPortalSchoolName: pick(row, cm, "مدرسة مطابقة في البوابة") || undefined,
     });
   });
 
@@ -519,15 +561,46 @@ export default function DataManagement() {
 
     if (exportSheets.schools) {
       const schoolsData = schools.map((s) => ({
+        "معرف المدرسة": s.id,
         "اسم المدرسة": s.name,
+        "الرقم الوزاري الرئيسي": s.ministerialNumber ?? "",
+        "عدد السجلات الوزارية": s.ministerialRecords?.length ?? 0,
         "المحافظة": s.governorate,
         "المرحلة الدراسية": s.level,
         "نوع المدرسة": s.type,
         "اسم المدير/ة": s.principalName,
         "سجل المدير/ة": s.principalNationalId,
         "جوال المدير/ة": s.principalPhone,
+        "بريد المدير/ة": s.principalEmail ?? "",
+        "مصدر بيانات المدير": s.principalDataSource ?? "",
+        "بريد المدرسة": s.schoolEmail ?? "",
+        "هاتف المدرسة": s.phone ?? "",
+        "المدينة/القرية": s.city ?? "",
+        "المركز الإداري": s.administrativeCenter ?? "",
+        "العنوان": s.address ?? "",
+        "خط العرض": s.latitude ?? "",
+        "خط الطول": s.longitude ?? "",
+        "ملكية المبنى": s.buildingOwnership ?? "",
+        "القطاع": s.sector ?? "",
+        "تحديد القطاع": s.sectorDetail ?? "",
       }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(schoolsData), "المدارس");
+
+      const ministerialRecordsData = schools.flatMap((school) =>
+        (school.ministerialRecords ?? []).map((record) => ({
+          "معرف المدرسة": school.id,
+          "اسم المدرسة التشغيلي": school.name,
+          "الرقم الوزاري": record.ministerialNumber,
+          "اسم المدرسة الوزاري": record.officialName,
+          "المرحلة": record.level,
+          "جنس المدرسة": record.gender,
+          "نوع المدرسة": record.schoolType ?? "",
+          "نوع التعليم": record.educationType ?? "",
+        }))
+      );
+      if (ministerialRecordsData.length > 0) {
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ministerialRecordsData), "السجلات الوزارية");
+      }
     }
 
     if (exportSheets.operations) {

@@ -19,6 +19,60 @@ function genId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+function normalizeSchoolKey(value: string | null | undefined) {
+  return (value ?? "")
+    .trim()
+    .replace(/[إأآا]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/\s+/g, " ");
+}
+
+function schoolImportKeys(school: School) {
+  const keys = new Set<string>();
+  if (school.ministerialNumber) keys.add(`ministerial:${school.ministerialNumber}`);
+  school.ministerialRecords?.forEach((record) => {
+    if (record.ministerialNumber) keys.add(`ministerial:${record.ministerialNumber}`);
+  });
+  const name = normalizeSchoolKey(school.name);
+  const governorate = normalizeSchoolKey(school.governorate);
+  if (name && governorate) keys.add(`name:${name}|${governorate}`);
+  return keys;
+}
+
+function upsertSchools(existing: School[], incoming: School[]) {
+  const result = [...existing];
+  const keyToIndex = new Map<string, number>();
+
+  result.forEach((school, index) => {
+    schoolImportKeys(school).forEach((key) => keyToIndex.set(key, index));
+  });
+
+  incoming.forEach((school) => {
+    const matchIndex = Array.from(schoolImportKeys(school))
+      .map((key) => keyToIndex.get(key))
+      .find((index): index is number => index !== undefined);
+
+    if (matchIndex === undefined) {
+      const nextIndex = result.length;
+      result.push(school);
+      schoolImportKeys(school).forEach((key) => keyToIndex.set(key, nextIndex));
+      return;
+    }
+
+    const updated = {
+      ...result[matchIndex],
+      ...school,
+      id: result[matchIndex].id,
+      isDemo: result[matchIndex].isDemo,
+    };
+    result[matchIndex] = updated;
+    schoolImportKeys(updated).forEach((key) => keyToIndex.set(key, matchIndex));
+  });
+
+  return result;
+}
+
 // ─── Backup snapshots ─────────────────────────────────────────────────────────
 // Stored in the shared DB so all users/devices share the same backup history.
 // localStorage is used only as a migration path for old local snapshots.
@@ -334,8 +388,8 @@ export function useStore() {
     (guards: Guard[], schools: School[]) => {
       setData({
         ...sharedData,
-        guards: [...sharedData.guards.filter((g) => g.isDemo), ...guards],
-        schools: [...sharedData.schools.filter((s) => s.isDemo), ...schools],
+        guards: guards.length > 0 ? [...sharedData.guards.filter((g) => g.isDemo), ...guards] : sharedData.guards,
+        schools: schools.length > 0 ? upsertSchools(sharedData.schools, schools) : sharedData.schools,
       });
     },
     [setData]

@@ -334,6 +334,14 @@ export default function SchoolProfile({ school, guards, gatekeepers, onClose }: 
                 label="النوع بنين/بنات"
                 value={school.type}
               />
+              <InfoRow label="الرقم الوزاري الرئيسي" value={school.ministerialNumber} />
+              <InfoRow label="عدد السجلات الوزارية" value={school.ministerialRecords?.length ? `${school.ministerialRecords.length} سجل` : ""} />
+              <InfoRow label="المدينة/القرية" value={school.city} />
+              <InfoRow label="المركز الإداري" value={school.administrativeCenter} />
+              <InfoRow label="العنوان" value={school.address} />
+              <InfoRow label="ملكية المبنى" value={school.buildingOwnership} />
+              <InfoRow label="القطاع" value={school.sector} />
+              <InfoRow label="تحديد القطاع" value={school.sectorDetail} />
             </div>
           </section>
 
@@ -347,8 +355,53 @@ export default function SchoolProfile({ school, guards, gatekeepers, onClose }: 
               <InfoRow label="اسم المدير/ة" value={school.principalName} />
               <InfoRow label="سجل المدير/ة" value={school.principalNationalId} />
               <InfoRow label="جوال المدير/ة" value={school.principalPhone} />
+              <InfoRow label="بريد المدير/ة" value={school.principalEmail} />
+              <InfoRow label="مصدر بيانات المدير" value={school.principalDataSource} />
+              <InfoRow label="مطابقة البوابة" value={school.matchedPortalSchoolName} />
+              <InfoRow label="بريد المدرسة" value={school.schoolEmail} />
+              <InfoRow label="هاتف المدرسة" value={school.phone} />
             </div>
           </section>
+
+          {school.ministerialRecords && school.ministerialRecords.length > 0 && (
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <Building2 className="w-4 h-4 text-primary" />
+                <h3 className="font-bold text-sm text-foreground">السجلات الوزارية المرتبطة</h3>
+                <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-primary/10 text-primary">
+                  {school.ministerialRecords.length} سجل
+                </span>
+              </div>
+              <div className="bg-white border border-border rounded-xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>الرقم الوزاري</th>
+                        <th>الاسم الوزاري</th>
+                        <th>المرحلة</th>
+                        <th>الجنس</th>
+                        <th>نوع المدرسة</th>
+                        <th>نوع التعليم</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {school.ministerialRecords.map((record) => (
+                        <tr key={record.ministerialNumber}>
+                          <td className="font-mono text-sm">{record.ministerialNumber}</td>
+                          <td className="font-medium text-foreground">{record.officialName || "—"}</td>
+                          <td>{record.level || "—"}</td>
+                          <td>{record.gender || "—"}</td>
+                          <td>{record.schoolType || "—"}</td>
+                          <td>{record.educationType || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+          )}
 
           {/* Guards */}
           <section>

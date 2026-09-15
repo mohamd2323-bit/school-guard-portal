@@ -757,6 +757,19 @@ export default function Schools() {
         s.level.includes(q) ||
         s.principalName.includes(q) ||
         s.principalNationalId.includes(q) ||
+        (s.principalPhone ?? "").includes(q) ||
+        (s.ministerialNumber ?? "").includes(q) ||
+        (s.schoolEmail ?? "").includes(q) ||
+        (s.principalEmail ?? "").includes(q) ||
+        (s.city ?? "").includes(q) ||
+        (s.administrativeCenter ?? "").includes(q) ||
+        (s.sector ?? "").includes(q) ||
+        (s.ministerialRecords ?? []).some((record) =>
+          record.ministerialNumber.includes(q) ||
+          record.officialName.includes(q) ||
+          record.level.includes(q) ||
+          (record.educationType ?? "").includes(q)
+        ) ||
         (gatekeepersBySchool.get(s.id) ?? []).some((gatekeeper) =>
           gatekeeper.name.includes(q) || gatekeeper.nationalId.includes(q) || gatekeeper.phone.includes(q)
         );
@@ -939,7 +952,6 @@ export default function Schools() {
                   <th>اسم المدير/ة</th>
                   <th>سجل المدير/ة</th>
                   <th>جوال المدير/ة</th>
-                  <th>عدد الحراس</th>
                   <th>
                     <SchoolFilterSelect
                       label="البوابين"
@@ -958,6 +970,7 @@ export default function Schools() {
                       compact
                     />
                   </th>
+                  <th>عدد الحراس</th>
                   <th>
                     <SchoolFilterSelect
                       label="الحالة"
@@ -1003,20 +1016,6 @@ export default function Schools() {
                       <td className="font-mono text-sm">{school.principalNationalId}</td>
                       <td dir="ltr" className="text-right font-mono text-sm">{school.principalPhone}</td>
 
-                      {/* Guard count */}
-                      <td>
-                        <div className="flex items-center justify-center">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold
-                            ${count > 0
-                              ? "bg-primary/10 text-primary"
-                              : "bg-orange-100 text-orange-700"
-                            }`}>
-                            <Shield className="w-3 h-3" />
-                            {count}
-                          </span>
-                        </div>
-                      </td>
-
                       {/* Gatekeeper count */}
                       <td>
                         <div className="flex items-center justify-center">
@@ -1041,6 +1040,20 @@ export default function Schools() {
                             }`}>
                             <Users className="w-3 h-3" />
                             {canHaveSchoolUsers ? userCount : "—"}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Guard count */}
+                      <td>
+                        <div className="flex items-center justify-center">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold
+                            ${count > 0
+                              ? "bg-primary/10 text-primary"
+                              : "bg-orange-100 text-orange-700"
+                            }`}>
+                            <Shield className="w-3 h-3" />
+                            {count}
                           </span>
                         </div>
                       </td>
