@@ -6,7 +6,7 @@ import {
   Search, School as SchoolIcon, FolderOpen, AlertTriangle,
   UserPlus, Briefcase, ClipboardList, X, Shield,
   Plus, Pencil, Trash2, Lock, Eye, EyeOff, Download, ChevronDown,
-  MapPin, Users,
+  MapPin, Users, GitMerge,
 } from "lucide-react";
 import SchoolProfile from "../components/SchoolProfile";
 import { exportSchoolsWorkbook } from "../lib/schoolsExcelExport";
@@ -46,6 +46,68 @@ function googleMapsSchoolUrl(school: School) {
     .filter(Boolean)
     .join(" ");
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
+function normalizeSchoolText(value: string | null | undefined) {
+  return (value ?? "")
+    .trim()
+    .replace(/[إأآا]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function onlyDigits(value: string | null | undefined) {
+  return (value ?? "").replace(/\D/g, "");
+}
+
+function canSuggestMerge(a: School, b: School) {
+  if (a.id === b.id) return false;
+  if (governorateKey(a.governorate) !== governorateKey(b.governorate)) return false;
+  if (a.type !== b.type) return false;
+
+  const samePrincipalId = onlyDigits(a.principalNationalId).length >= 8 &&
+    onlyDigits(a.principalNationalId) === onlyDigits(b.principalNationalId);
+  const samePrincipalPhone = onlyDigits(a.principalPhone).length >= 9 &&
+    onlyDigits(a.principalPhone) === onlyDigits(b.principalPhone);
+  const samePrincipalName = normalizeSchoolText(a.principalName) &&
+    normalizeSchoolText(a.principalName) === normalizeSchoolText(b.principalName);
+
+  return samePrincipalId || (samePrincipalPhone && samePrincipalName);
+}
+
+function schoolLinkCount(
+  schoolId: string,
+  guardCountMap: Map<string, number>,
+  schoolUserCountMap: Map<string, number>,
+  gatekeeperCountMap: Map<string, number>,
+  needs: Need[],
+) {
+  const needCount = needs.filter((need) => need.schoolId === schoolId && need.status !== "مغلق").length;
+  return (guardCountMap.get(schoolId) ?? 0) +
+    (schoolUserCountMap.get(schoolId) ?? 0) +
+    (gatekeeperCountMap.get(schoolId) ?? 0) +
+    needCount;
+}
+
+function chooseMergeTarget(
+  a: School,
+  b: School,
+  guardCountMap: Map<string, number>,
+  schoolUserCountMap: Map<string, number>,
+  gatekeeperCountMap: Map<string, number>,
+  needs: Need[],
+) {
+  const aScore = schoolLinkCount(a.id, guardCountMap, schoolUserCountMap, gatekeeperCountMap, needs);
+  const bScore = schoolLinkCount(b.id, guardCountMap, schoolUserCountMap, gatekeeperCountMap, needs);
+  if (aScore !== bScore) return aScore > bScore ? { target: a, source: b } : { target: b, source: a };
+
+  const aRecords = a.ministerialRecords?.length ?? 0;
+  const bRecords = b.ministerialRecords?.length ?? 0;
+  if (aRecords !== bRecords) return aRecords > bRecords ? { target: a, source: b } : { target: b, source: a };
+
+  return a.name.length <= b.name.length ? { target: a, source: b } : { target: b, source: a };
 }
 
 // ─── Filter type & persistence ────────────────────────────────────────────────
@@ -609,11 +671,12 @@ function SchoolFormModal({
 // ─── Action menu for no-guard schools ────────────────────────────────────────
 
 type ActionModal = { type: "assign" | "temp" | "need"; school: School };
+type MergeModal = { target: School; source: School };
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Schools() {
-  const { schools, guards, gatekeepers, addSchool, updateSchool, deleteSchool } = useStore();
+  const { schools, guards, gatekeepers, needs, addSchool, updateSchool, deleteSchool, mergeSchools } = useStore();
   const { currentUser, isAdmin } = useUsers();
   const [, navigate] = useLocation();
 
@@ -647,6 +710,7 @@ export default function Schools() {
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [actionModal, setActionModal] = useState<ActionModal | null>(null);
   const [formModal, setFormModal] = useState<{ mode: "add" } | { mode: "edit"; school: School } | null>(null);
+  const [mergeModal, setMergeModal] = useState<MergeModal | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<School | null>(null);
   const [deletePassword, setDeletePassword] = useState("");
   const [deletePasswordError, setDeletePasswordError] = useState("");
@@ -723,6 +787,21 @@ export default function Schools() {
     schools.filter((s) => !guardCountMap.has(s.id)).length,
     [schools, guardCountMap]
   );
+
+  const mergeCandidates = useMemo(() => {
+    const candidates = new Map<string, MergeModal>();
+    for (let i = 0; i < schools.length; i++) {
+      for (let j = i + 1; j < schools.length; j++) {
+        const first = schools[i];
+        const second = schools[j];
+        if (!canSuggestMerge(first, second)) continue;
+        const pair = chooseMergeTarget(first, second, guardCountMap, schoolUserCountMap, gatekeeperCountMap, needs);
+        if (!candidates.has(first.id)) candidates.set(first.id, pair);
+        if (!candidates.has(second.id)) candidates.set(second.id, pair);
+      }
+    }
+    return candidates;
+  }, [gatekeeperCountMap, guardCountMap, needs, schoolUserCountMap, schools]);
 
   const filterOptions = useMemo(() => ({
     governorates: uniqueGovernorates(schools.map((school) => school.governorate)),
@@ -841,6 +920,27 @@ export default function Schools() {
     setDeleteTarget(null);
     setDeletePassword("");
     setDeletePasswordError("");
+  }
+
+  function openMergeDialog(school: School) {
+    if (!isAdmin) {
+      setUnauthorizedMsg("غير مصرح لك بدمج المدارس");
+      setTimeout(() => setUnauthorizedMsg(null), 3000);
+      return;
+    }
+    const candidate = mergeCandidates.get(school.id);
+    if (candidate) setMergeModal(candidate);
+  }
+
+  function handleMerge() {
+    if (!mergeModal || !currentUser) return;
+    mergeSchools(mergeModal.target.id, mergeModal.source.id, {
+      username: currentUser.username,
+      targetName: mergeModal.target.name,
+      sourceName: mergeModal.source.name,
+    });
+    setMergeModal(null);
+    setSelectedSchool(null);
   }
 
   return (
@@ -1105,6 +1205,17 @@ export default function Schools() {
                             تعديل
                           </button>
 
+                          {mergeCandidates.has(school.id) && (
+                            <button
+                              onClick={() => openMergeDialog(school)}
+                              title="دمج مع سجل مشابه"
+                              className="flex items-center gap-1 text-xs bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200 px-2 py-1.5 rounded-lg transition-colors font-semibold"
+                            >
+                              <GitMerge className="w-3.5 h-3.5" />
+                              دمج
+                            </button>
+                          )}
+
                           {/* حذف — مدير النظام فقط */}
                           {isAdmin ? (
                             <button
@@ -1281,6 +1392,95 @@ export default function Schools() {
               </button>
               <button
                 onClick={() => { setDeleteTarget(null); setDeletePassword(""); setDeletePasswordError(""); }}
+                className="flex-1 bg-muted text-foreground py-2.5 rounded-xl text-sm font-semibold hover:bg-muted/80 transition-colors"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Merge confirmation */}
+      {mergeModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" dir="rtl">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 space-y-5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0">
+                <GitMerge className="w-5 h-5 text-violet-700" />
+              </div>
+              <div>
+                <h3 className="font-bold text-foreground">دمج سجلي مدرسة</h3>
+                <p className="text-muted-foreground text-xs mt-0.5">
+                  سيتم نقل الارتباطات للسجل الأساسي ثم حذف السجل الزائد.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <p className="text-xs font-bold text-emerald-700 mb-2">السجل الذي سيبقى</p>
+                <p className="font-bold text-foreground leading-7">{mergeModal.target.name}</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {mergeModal.target.governorate} · {mergeModal.target.type} · {mergeModal.target.level || "بدون مرحلة"}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {mergeModal.target.principalName || "بدون مدير/ة"} · {mergeModal.target.principalNationalId || "بدون سجل"}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-xs font-bold text-amber-700 mb-2">السجل الذي سيتم دمجه</p>
+                <p className="font-bold text-foreground leading-7">{mergeModal.source.name}</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {mergeModal.source.governorate} · {mergeModal.source.type} · {mergeModal.source.level || "بدون مرحلة"}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {mergeModal.source.principalName || "بدون مدير/ة"} · {mergeModal.source.principalNationalId || "بدون سجل"}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border bg-muted/40 p-4">
+              <p className="text-sm font-bold text-foreground mb-2">ما الذي سينتقل؟</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-center text-xs">
+                <div className="rounded-lg bg-white p-2 border border-border">
+                  <p className="font-bold text-primary">{(guardCountMap.get(mergeModal.source.id) ?? 0).toLocaleString("ar-SA")}</p>
+                  <p className="text-muted-foreground mt-0.5">حراس</p>
+                </div>
+                <div className="rounded-lg bg-white p-2 border border-border">
+                  <p className="font-bold text-pink-700">{(schoolUserCountMap.get(mergeModal.source.id) ?? 0).toLocaleString("ar-SA")}</p>
+                  <p className="text-muted-foreground mt-0.5">مستخدمات</p>
+                </div>
+                <div className="rounded-lg bg-white p-2 border border-border">
+                  <p className="font-bold text-blue-700">{(gatekeeperCountMap.get(mergeModal.source.id) ?? 0).toLocaleString("ar-SA")}</p>
+                  <p className="text-muted-foreground mt-0.5">بوابون</p>
+                </div>
+                <div className="rounded-lg bg-white p-2 border border-border">
+                  <p className="font-bold text-amber-700">
+                    {needs.filter((need) => need.schoolId === mergeModal.source.id && need.status !== "مغلق").length.toLocaleString("ar-SA")}
+                  </p>
+                  <p className="text-muted-foreground mt-0.5">احتياجات مفتوحة</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={handleMerge}
+                className="flex-1 bg-violet-700 text-white py-2.5 rounded-xl text-sm font-bold hover:bg-violet-800 transition-colors flex items-center justify-center gap-2"
+              >
+                <GitMerge className="w-4 h-4" />
+                تأكيد الدمج
+              </button>
+              <button
+                onClick={() => setMergeModal({ target: mergeModal.source, source: mergeModal.target })}
+                className="px-4 bg-white text-violet-700 border border-violet-200 py-2.5 rounded-xl text-sm font-semibold hover:bg-violet-50 transition-colors"
+              >
+                تبديل الأساسي
+              </button>
+              <button
+                onClick={() => setMergeModal(null)}
                 className="flex-1 bg-muted text-foreground py-2.5 rounded-xl text-sm font-semibold hover:bg-muted/80 transition-colors"
               >
                 إلغاء

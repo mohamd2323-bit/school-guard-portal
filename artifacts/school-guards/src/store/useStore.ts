@@ -73,6 +73,70 @@ function upsertSchools(existing: School[], incoming: School[]) {
   return result;
 }
 
+function firstFilled(...values: Array<string | undefined | null>) {
+  return values.map((value) => value?.trim()).find(Boolean) ?? "";
+}
+
+function mergeTextValues(...values: Array<string | undefined | null>) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  values
+    .flatMap((value) => (value ?? "").split("/"))
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .forEach((value) => {
+      const key = normalizeSchoolKey(value);
+      if (seen.has(key)) return;
+      seen.add(key);
+      result.push(value);
+    });
+  return result.join(" / ");
+}
+
+function mergeMinisterialRecords(target: School, source: School) {
+  const records = [...(target.ministerialRecords ?? []), ...(source.ministerialRecords ?? [])];
+  const seen = new Set<string>();
+  return records.filter((record) => {
+    const key = record.ministerialNumber
+      ? `number:${record.ministerialNumber}`
+      : `name:${normalizeSchoolKey(record.officialName)}|${normalizeSchoolKey(record.level)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function mergeSchoolRecord(target: School, source: School): School {
+  const ministerialRecords = mergeMinisterialRecords(target, source);
+  return {
+    ...source,
+    ...target,
+    name: target.name,
+    governorate: firstFilled(target.governorate, source.governorate),
+    level: mergeTextValues(target.level, source.level),
+    type: target.type,
+    principalName: firstFilled(target.principalName, source.principalName),
+    principalNationalId: firstFilled(target.principalNationalId, source.principalNationalId),
+    principalPhone: firstFilled(target.principalPhone, source.principalPhone),
+    ministerialNumber: firstFilled(target.ministerialNumber, source.ministerialNumber),
+    ministerialRecords,
+    principalEmail: firstFilled(target.principalEmail, source.principalEmail),
+    schoolEmail: firstFilled(target.schoolEmail, source.schoolEmail),
+    phone: firstFilled(target.phone, source.phone),
+    city: firstFilled(target.city, source.city),
+    administrativeCenter: firstFilled(target.administrativeCenter, source.administrativeCenter),
+    address: firstFilled(target.address, source.address),
+    latitude: firstFilled(target.latitude, source.latitude),
+    longitude: firstFilled(target.longitude, source.longitude),
+    buildingOwnership: firstFilled(target.buildingOwnership, source.buildingOwnership),
+    sector: firstFilled(target.sector, source.sector),
+    sectorDetail: firstFilled(target.sectorDetail, source.sectorDetail),
+    principalDataSource: target.principalDataSource ?? source.principalDataSource,
+    matchedPortalSchoolName: firstFilled(target.matchedPortalSchoolName, source.matchedPortalSchoolName),
+    isDemo: target.isDemo,
+  };
+}
+
 // ─── Backup snapshots ─────────────────────────────────────────────────────────
 // Stored in the shared DB so all users/devices share the same backup history.
 // localStorage is used only as a migration path for old local snapshots.
@@ -678,6 +742,85 @@ export function useStore() {
     [setData]
   );
 
+  const mergeSchools = useCallback(
+    (targetId: string, sourceId: string, logEntry?: { username: string; targetName: string; sourceName: string }) => {
+      if (targetId === sourceId) return;
+      const target = sharedData.schools.find((school) => school.id === targetId);
+      const source = sharedData.schools.find((school) => school.id === sourceId);
+      if (!target || !source) return;
+
+      const merged = mergeSchoolRecord(target, source);
+      const logOp: Operation | null = logEntry
+        ? {
+            id: genId(),
+            type: "أخرى",
+            guardId: null,
+            guardName: logEntry.targetName,
+            date: new Date().toISOString().split("T")[0],
+            notes: "دمج سجلي مدرسة متشابهين",
+            createdAt: new Date().toISOString(),
+            details: {
+              summary: "دمج سجلي مدرسة",
+              targetSchoolId: targetId,
+              sourceSchoolId: sourceId,
+              targetSchoolName: logEntry.targetName,
+              sourceSchoolName: logEntry.sourceName,
+              mergedBy: logEntry.username,
+            },
+          }
+        : null;
+
+      setData({
+        ...sharedData,
+        schools: sharedData.schools
+          .filter((school) => school.id !== sourceId)
+          .map((school) => (school.id === targetId ? merged : school)),
+        guards: sharedData.guards.map((guard) =>
+          guard.schoolId === sourceId
+            ? { ...guard, schoolId: targetId, schoolName: merged.name, governorate: merged.governorate }
+            : guard.schoolId === targetId
+              ? { ...guard, schoolName: merged.name, governorate: merged.governorate }
+              : guard
+        ),
+        gatekeepers: sharedData.gatekeepers.map((gatekeeper) =>
+          gatekeeper.schoolId === sourceId ? { ...gatekeeper, schoolId: targetId, updatedAt: new Date().toISOString() } : gatekeeper
+        ),
+        needs: sharedData.needs.map((need) =>
+          need.schoolId === sourceId || need.schoolId === targetId
+            ? {
+                ...need,
+                schoolId: targetId,
+                schoolName: merged.name,
+                governorate: merged.governorate,
+                principalName: merged.principalName,
+                principalNationalId: merged.principalNationalId,
+                principalPhone: merged.principalPhone,
+              }
+            : need
+        ),
+        tickets: sharedData.tickets.map((ticket) =>
+          ticket.schoolId === sourceId || ticket.schoolId === targetId
+            ? {
+                ...ticket,
+                schoolId: targetId,
+                schoolName: merged.name,
+                governorate: merged.governorate,
+                principalName: merged.principalName,
+                principalPhone: merged.principalPhone,
+              }
+            : ticket
+        ),
+        violations: sharedData.violations.map((violation) =>
+          violation.schoolId === sourceId || violation.schoolId === targetId
+            ? { ...violation, schoolId: targetId, schoolName: merged.name, governorate: merged.governorate }
+            : violation
+        ),
+        operations: logOp ? [logOp, ...sharedData.operations] : sharedData.operations,
+      });
+    },
+    [setData]
+  );
+
   // ── Violations ─────────────────────────────────────────────────────────────
   const addViolation = useCallback(
     (v: Violation) => setData({ ...sharedData, violations: [v, ...sharedData.violations] }),
@@ -737,6 +880,7 @@ export function useStore() {
     addSchool,
     updateSchool,
     deleteSchool,
+    mergeSchools,
     addViolation,
     updateViolation,
     deleteViolation,
