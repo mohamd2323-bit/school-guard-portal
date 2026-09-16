@@ -25,13 +25,20 @@ const GUARD_HEADERS = [
 ];
 
 const SCHOOL_HEADERS = [
+  "حالة التحديث",
+  "سبب المراجعة",
   "المحافظة",
   "اسم المدرسة",
   "المرحلة",
   "النوع",
+  "الرقم الوزاري الرئيسي",
+  "عدد السجلات الوزارية",
+  "الأرقام الوزارية",
   "اسم المدير/ة",
   "رقم هوية/سجل المدير/ة",
   "جوال المدير/ة",
+  "مصدر بيانات المدير",
+  "مطابقة البوابة",
   "عدد الحراس",
   "عدد البوابين",
 ];
@@ -158,6 +165,24 @@ function buildGuardRows(schools: School[], guards: Guard[]) {
   });
 }
 
+function ministerialNumbersForSchool(school: School) {
+  const numbers = new Set<string>();
+  if (school.ministerialNumber?.trim()) numbers.add(school.ministerialNumber.trim());
+  school.ministerialRecords?.forEach((record) => {
+    if (record.ministerialNumber?.trim()) numbers.add(record.ministerialNumber.trim());
+  });
+  return Array.from(numbers);
+}
+
+function hasLatestSchoolInfo(school: School) {
+  return ministerialNumbersForSchool(school).length > 0;
+}
+
+function schoolReviewReason(school: School) {
+  if (hasLatestSchoolInfo(school)) return "بيانات وزارية موجودة";
+  return "لا يوجد رقم وزاري أو سجلات وزارية؛ يظهر في آخر البيان للمراجعة";
+}
+
 function buildSchoolRows(schools: School[], guards: Guard[], gatekeepers: Gatekeeper[] = []) {
   const guardsBySchool = buildMaleGuardsBySchool(guards);
   const gatekeepersBySchool = new Map<string, number>();
@@ -166,16 +191,30 @@ function buildSchoolRows(schools: School[], guards: Guard[], gatekeepers: Gateke
     gatekeepersBySchool.set(gatekeeper.schoolId, (gatekeepersBySchool.get(gatekeeper.schoolId) ?? 0) + 1);
   });
 
-  return schools.map((school) => {
+  const sortedSchools = [...schools].sort((a, b) =>
+    Number(!hasLatestSchoolInfo(a)) - Number(!hasLatestSchoolInfo(b)) ||
+    a.governorate.localeCompare(b.governorate, "ar") ||
+    a.name.localeCompare(b.name, "ar")
+  );
+
+  return sortedSchools.map((school) => {
     const schoolRecord = asRecord(school);
+    const ministerialNumbers = ministerialNumbersForSchool(school);
     return [
+      hasLatestSchoolInfo(school) ? "محدث" : "بحاجة للمراجعة",
+      schoolReviewReason(school),
       valueFor(schoolRecord, "governorate"),
       valueFor(schoolRecord, "name"),
       valueFor(schoolRecord, "level"),
       valueFor(schoolRecord, "type"),
+      valueFor(schoolRecord, "ministerialNumber"),
+      school.ministerialRecords?.length ?? 0,
+      ministerialNumbers.join(" | "),
       valueFor(schoolRecord, "principalName"),
       firstValue(schoolRecord, ["principalNationalId", "principalCivilId"]),
       firstValue(schoolRecord, ["principalPhone", "principalMobile"]),
+      valueFor(schoolRecord, "principalDataSource"),
+      valueFor(schoolRecord, "matchedPortalSchoolName"),
       guardsBySchool.get(school.id)?.length ?? 0,
       gatekeepersBySchool.get(school.id) ?? 0,
     ];
