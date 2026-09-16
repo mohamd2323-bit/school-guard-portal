@@ -341,6 +341,25 @@ function processWorkbook(
   return { schools: schools.filter((s) => !existingSchools.includes(s)), guards, linkedCount, errors, foundSchoolSheet, foundGuardSheet };
 }
 
+function ministerialNumbersForSchool(school: School) {
+  const numbers = new Set<string>();
+  if (school.ministerialNumber?.trim()) numbers.add(school.ministerialNumber.trim());
+  school.ministerialRecords?.forEach((record) => {
+    if (record.ministerialNumber?.trim()) numbers.add(record.ministerialNumber.trim());
+  });
+  return Array.from(numbers);
+}
+
+function hasLatestSchoolInfo(school: School) {
+  return ministerialNumbersForSchool(school).length > 0 && school.principalDataSource !== "البوابة";
+}
+
+function schoolReviewReason(school: School) {
+  if (hasLatestSchoolInfo(school)) return "بيانات وزارية موجودة";
+  if (school.principalDataSource === "البوابة") return "ما زال على بيانات البوابة القديمة؛ يظهر في آخر البيان للمراجعة";
+  return "لا يوجد رقم وزاري أو سجلات وزارية؛ يظهر في آخر البيان للمراجعة";
+}
+
 // ─── Drop zone sub-component ─────────────────────────────────────────────────
 
 function DropZone({
@@ -560,11 +579,20 @@ export default function DataManagement() {
     }
 
     if (exportSheets.schools) {
-      const schoolsData = schools.map((s) => ({
+      const schoolsData = [...schools]
+        .sort((a, b) =>
+          Number(!hasLatestSchoolInfo(a)) - Number(!hasLatestSchoolInfo(b)) ||
+          a.governorate.localeCompare(b.governorate, "ar") ||
+          a.name.localeCompare(b.name, "ar")
+        )
+        .map((s) => ({
+        "حالة التحديث": hasLatestSchoolInfo(s) ? "محدث" : "بحاجة للمراجعة",
+        "سبب المراجعة": schoolReviewReason(s),
         "معرف المدرسة": s.id,
         "اسم المدرسة": s.name,
         "الرقم الوزاري الرئيسي": s.ministerialNumber ?? "",
         "عدد السجلات الوزارية": s.ministerialRecords?.length ?? 0,
+        "الأرقام الوزارية": ministerialNumbersForSchool(s).join(" | "),
         "المحافظة": s.governorate,
         "المرحلة الدراسية": s.level,
         "نوع المدرسة": s.type,

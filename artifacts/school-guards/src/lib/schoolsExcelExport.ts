@@ -175,11 +175,14 @@ function ministerialNumbersForSchool(school: School) {
 }
 
 function hasLatestSchoolInfo(school: School) {
-  return ministerialNumbersForSchool(school).length > 0;
+  return ministerialNumbersForSchool(school).length > 0 && school.principalDataSource !== "البوابة";
 }
 
 function schoolReviewReason(school: School) {
   if (hasLatestSchoolInfo(school)) return "بيانات وزارية موجودة";
+  if (school.principalDataSource === "البوابة") {
+    return "ما زال على بيانات البوابة القديمة؛ يظهر في آخر البيان للمراجعة";
+  }
   return "لا يوجد رقم وزاري أو سجلات وزارية؛ يظهر في آخر البيان للمراجعة";
 }
 
