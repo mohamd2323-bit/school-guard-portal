@@ -54,8 +54,9 @@ function normalizeSchoolText(value: string | null | undefined) {
     .replace(/[إأآا]/g, "ا")
     .replace(/ى/g, "ي")
     .replace(/ة/g, "ه")
-    .replace(/[^\w\s]/g, " ")
-    .replace(/\s+/g, " ");
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function onlyDigits(value: string | null | undefined) {
@@ -711,6 +712,8 @@ export default function Schools() {
   const [actionModal, setActionModal] = useState<ActionModal | null>(null);
   const [formModal, setFormModal] = useState<{ mode: "add" } | { mode: "edit"; school: School } | null>(null);
   const [mergeModal, setMergeModal] = useState<MergeModal | null>(null);
+  const [mergeSource, setMergeSource] = useState<School | null>(null);
+  const [mergeSearch, setMergeSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<School | null>(null);
   const [deletePassword, setDeletePassword] = useState("");
   const [deletePasswordError, setDeletePasswordError] = useState("");
@@ -788,20 +791,19 @@ export default function Schools() {
     [schools, guardCountMap]
   );
 
-  const mergeCandidates = useMemo(() => {
-    const candidates = new Map<string, MergeModal>();
-    for (let i = 0; i < schools.length; i++) {
-      for (let j = i + 1; j < schools.length; j++) {
-        const first = schools[i];
-        const second = schools[j];
-        if (!canSuggestMerge(first, second)) continue;
-        const pair = chooseMergeTarget(first, second, guardCountMap, schoolUserCountMap, gatekeeperCountMap, needs);
-        if (!candidates.has(first.id)) candidates.set(first.id, pair);
-        if (!candidates.has(second.id)) candidates.set(second.id, pair);
-      }
-    }
-    return candidates;
-  }, [gatekeeperCountMap, guardCountMap, needs, schoolUserCountMap, schools]);
+  const mergeOptions = useMemo(() => {
+    if (!mergeSource) return [];
+    const query = normalizeSchoolText(mergeSearch);
+    return schools.filter((school) =>
+      school.id !== mergeSource.id &&
+      governorateKey(school.governorate) === governorateKey(mergeSource.governorate) &&
+      school.type === mergeSource.type &&
+      normalizeSchoolText(school.name).includes(query)
+    ).sort((a, b) =>
+      Number(canSuggestMerge(mergeSource, b)) - Number(canSuggestMerge(mergeSource, a)) ||
+      a.name.localeCompare(b.name, "ar")
+    );
+  }, [schools, mergeSource, mergeSearch]);
 
   const filterOptions = useMemo(() => ({
     governorates: uniqueGovernorates(schools.map((school) => school.governorate)),
@@ -928,12 +930,12 @@ export default function Schools() {
       setTimeout(() => setUnauthorizedMsg(null), 3000);
       return;
     }
-    const candidate = mergeCandidates.get(school.id);
-    if (candidate) setMergeModal(candidate);
+    setMergeSource(school);
+    setMergeSearch("");
   }
 
   function handleMerge() {
-    if (!mergeModal || !currentUser) return;
+    if (!mergeModal || !currentUser || !isAdmin) return;
     mergeSchools(mergeModal.target.id, mergeModal.source.id, {
       username: currentUser.username,
       targetName: mergeModal.target.name,
@@ -1205,10 +1207,10 @@ export default function Schools() {
                             تعديل
                           </button>
 
-                          {mergeCandidates.has(school.id) && (
+                          {isAdmin && (
                             <button
                               onClick={() => openMergeDialog(school)}
-                              title="دمج مع سجل مشابه"
+                              title="اختيار مدرسة للدمج"
                               className="flex items-center gap-1 text-xs bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200 px-2 py-1.5 rounded-lg transition-colors font-semibold"
                             >
                               <GitMerge className="w-3.5 h-3.5" />
@@ -1399,6 +1401,44 @@ export default function Schools() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Select the other school explicitly, even when principal details are missing. */}
+      {mergeSource && (
+        <ModalShell title="اختيار مدرسة للدمج" subtitle={mergeSource.name} icon={<GitMerge className="w-4 h-4" />} onClose={() => setMergeSource(null)}>
+          <div className="space-y-4">
+            <SchoolInfoBox school={mergeSource} />
+            <p className="text-sm text-muted-foreground">
+              اختر السجل الآخر من نفس المحافظة والنوع. ستراجع السجل الأساسي والارتباطات قبل تأكيد الدمج.
+            </p>
+            <input
+              type="search"
+              aria-label="البحث عن مدرسة للدمج"
+              placeholder="ابحث باسم المدرسة..."
+              value={mergeSearch}
+              onChange={(event) => setMergeSearch(event.target.value)}
+              className="w-full px-3 py-2.5 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              autoFocus
+            />
+            <div className="max-h-64 overflow-y-auto space-y-2">
+              {mergeOptions.length === 0 && <p className="text-sm text-muted-foreground py-4">لا توجد مدارس مطابقة للبحث في نفس المحافظة والنوع.</p>}
+              {mergeOptions.map((school) => (
+                <button
+                  key={school.id}
+                  type="button"
+                  onClick={() => {
+                    setMergeModal(chooseMergeTarget(mergeSource, school, guardCountMap, schoolUserCountMap, gatekeeperCountMap, needs));
+                    setMergeSource(null);
+                  }}
+                  className="w-full text-right rounded-xl border border-border px-4 py-3 hover:bg-violet-50 hover:border-violet-200"
+                >
+                  <p className="text-sm font-semibold">{school.name}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{school.governorate} · {school.type} · {school.level || "بدون مرحلة"}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        </ModalShell>
       )}
 
       {/* Merge confirmation */}
