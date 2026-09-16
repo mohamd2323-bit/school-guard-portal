@@ -1124,24 +1124,28 @@ export default function Schools({ scope = "schools" }: { scope?: SchoolsScope })
                   <th>اسم المدير/ة</th>
                   <th>سجل المدير/ة</th>
                   <th>جوال المدير/ة</th>
-                  <th>
-                    <SchoolFilterSelect
-                      label="البوابين"
-                      value={gatekeeperFilter === "all" ? "" : gatekeeperFilter}
-                      options={gatekeeperStatusOptions}
-                      onChange={(value) => setGatekeeperFilter((value || "all") as GatekeeperFilter)}
-                      compact
-                    />
-                  </th>
-                  <th>
-                    <SchoolFilterSelect
-                      label="المستخدمات"
-                      value={schoolUserFilter === "all" ? "" : schoolUserFilter}
-                      options={schoolUserStatusOptions}
-                      onChange={(value) => setSchoolUserFilter((value || "all") as SchoolUserFilter)}
-                      compact
-                    />
-                  </th>
+                  {!isAdministrationsPage && (
+                    <>
+                      <th>
+                        <SchoolFilterSelect
+                          label="البوابين"
+                          value={gatekeeperFilter === "all" ? "" : gatekeeperFilter}
+                          options={gatekeeperStatusOptions}
+                          onChange={(value) => setGatekeeperFilter((value || "all") as GatekeeperFilter)}
+                          compact
+                        />
+                      </th>
+                      <th>
+                        <SchoolFilterSelect
+                          label="المستخدمات"
+                          value={schoolUserFilter === "all" ? "" : schoolUserFilter}
+                          options={schoolUserStatusOptions}
+                          onChange={(value) => setSchoolUserFilter((value || "all") as SchoolUserFilter)}
+                          compact
+                        />
+                      </th>
+                    </>
+                  )}
                   <th>عدد الحراس</th>
                   <th>
                     <SchoolFilterSelect
@@ -1209,33 +1213,37 @@ export default function Schools({ scope = "schools" }: { scope?: SchoolsScope })
                       <td className="font-mono text-sm">{school.principalNationalId}</td>
                       <td dir="ltr" className="text-right font-mono text-sm">{school.principalPhone}</td>
 
-                      {/* Gatekeeper count */}
-                      <td>
-                        <div className="flex items-center justify-center">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold
-                            ${gatekeeperCount > 0
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-muted text-muted-foreground"
-                            }`}>
-                            <Users className="w-3 h-3" />
-                            {gatekeeperCount}
-                          </span>
-                        </div>
-                      </td>
+                      {!isAdministrationsPage && (
+                        <>
+                          {/* Gatekeeper count */}
+                          <td>
+                            <div className="flex items-center justify-center">
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold
+                                ${gatekeeperCount > 0
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-muted text-muted-foreground"
+                                }`}>
+                                <Users className="w-3 h-3" />
+                                {gatekeeperCount}
+                              </span>
+                            </div>
+                          </td>
 
-                      {/* School users count */}
-                      <td>
-                        <div className="flex items-center justify-center">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold
-                            ${userCount > 0
-                              ? "bg-pink-100 text-pink-700"
-                              : "bg-muted text-muted-foreground"
-                            }`}>
-                            <Users className="w-3 h-3" />
-                            {canHaveSchoolUsers ? userCount : "—"}
-                          </span>
-                        </div>
-                      </td>
+                          {/* School users count */}
+                          <td>
+                            <div className="flex items-center justify-center">
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold
+                                ${userCount > 0
+                                  ? "bg-pink-100 text-pink-700"
+                                  : "bg-muted text-muted-foreground"
+                                }`}>
+                                <Users className="w-3 h-3" />
+                                {canHaveSchoolUsers ? userCount : "—"}
+                              </span>
+                            </div>
+                          </td>
+                        </>
+                      )}
 
                       {/* Guard count */}
                       <td>
