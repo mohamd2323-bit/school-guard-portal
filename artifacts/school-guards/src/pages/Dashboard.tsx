@@ -158,14 +158,15 @@ export default function Dashboard() {
   const displayName = currentUser?.name?.trim() || currentUser?.username || "مستخدم النظام";
 
   const isEmpty = guards.length === 0 && schools.length === 0;
+  const schoolRecords = useMemo(() => schools.filter((school) => school.type !== "مختلط"), [schools]);
 
   // Unique filter options
   const govOptions = useMemo(() =>
     uniqueGovernorates([
       ...guards.map((g) => g.governorate),
-      ...schools.map((s) => s.governorate),
+      ...schoolRecords.map((s) => s.governorate),
     ]),
-    [guards, schools]
+    [guards, schoolRecords]
   );
 
   const jobOptions = useMemo(() =>
@@ -186,8 +187,8 @@ export default function Dashboard() {
 
   // Filtered schools (governorate filter only)
   const filteredSchools = useMemo(() =>
-    filterGov ? schools.filter((s) => governorateKey(s.governorate) === governorateKey(filterGov)) : schools,
-    [schools, filterGov]
+    filterGov ? schoolRecords.filter((s) => governorateKey(s.governorate) === governorateKey(filterGov)) : schoolRecords,
+    [schoolRecords, filterGov]
   );
 
   const filteredNeeds = useMemo(() =>

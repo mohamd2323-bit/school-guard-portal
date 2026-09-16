@@ -4,7 +4,7 @@ import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Guards from "./pages/Guards";
 import Gatekeepers from "./pages/Gatekeepers";
-import Schools from "./pages/Schools";
+import Schools, { Administrations } from "./pages/Schools";
 import DataManagement from "./pages/DataManagement";
 import Needs from "./pages/Needs";
 import Operations from "./pages/Operations";
@@ -24,6 +24,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/guards": "وزارة التعليم | إدارة الحراس",
   "/gatekeepers": "وزارة التعليم | إدارة البوابين",
   "/schools": "وزارة التعليم | إدارة المدارس",
+  "/administrations": "وزارة التعليم | الإدارات",
   "/operations": "وزارة التعليم | العمليات",
   "/needs": "وزارة التعليم | الاحتياج",
   "/violations": "وزارة التعليم | المخالفات",
@@ -76,7 +77,8 @@ function Router() {
         <Route path="/" component={Dashboard} />
         <Route path="/guards" component={Guards} />
         <Route path="/gatekeepers" component={Gatekeepers} />
-        <Route path="/schools" component={Schools} />
+        <Route path="/schools">{() => <Schools />}</Route>
+        <Route path="/administrations">{() => <Administrations />}</Route>
         <Route path="/needs" component={Needs} />
         <Route path="/operations" component={Operations} />
         <Route path="/violations" component={Violations} />

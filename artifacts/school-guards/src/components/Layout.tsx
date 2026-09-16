@@ -5,6 +5,7 @@ import { useUsers } from "../store/useUsers";
 import moeLogoTransparent from "../assets/images/moe-logo-transparent.png";
 import {
   AlertTriangle,
+  Building2,
   ClipboardList,
   Database,
   DoorOpen,
@@ -35,6 +36,7 @@ const navGroups = [
       { href: "/guards", label: "إدارة الحراس", icon: ShieldCheck },
       { href: "/gatekeepers", label: "إدارة البوابين", icon: DoorOpen },
       { href: "/schools", label: "إدارة المدارس", icon: School },
+      { href: "/administrations", label: "إدارات", icon: Building2 },
     ],
   },
   {

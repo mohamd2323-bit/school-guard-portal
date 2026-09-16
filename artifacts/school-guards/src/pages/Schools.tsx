@@ -134,8 +134,10 @@ function chooseMergeTarget(
 type GuardFilter = "all" | "no-guard" | "has-guard";
 type SchoolUserFilter = "all" | "no-staff" | "has-staff";
 type GatekeeperFilter = "all" | "no-gatekeeper" | "has-gatekeeper";
+type SchoolsScope = "schools" | "administrations";
 
 const SCHOOLS_STORAGE_KEY = "schoolsFilters";
+const ADMINISTRATIONS_STORAGE_KEY = "administrationsFilters";
 
 interface SchoolsPersistedState {
   search: string;
@@ -146,7 +148,15 @@ interface SchoolsPersistedState {
   typeFilter: string;
 }
 
-function initSchoolsState(): SchoolsPersistedState {
+function schoolsStorageKey(scope: SchoolsScope) {
+  return scope === "administrations" ? ADMINISTRATIONS_STORAGE_KEY : SCHOOLS_STORAGE_KEY;
+}
+
+function isAdministrationRecord(school: School) {
+  return school.type === "مختلط";
+}
+
+function initSchoolsState(scope: SchoolsScope): SchoolsPersistedState {
   const p = new URLSearchParams(window.location.search);
   const hasUrlFilters = p.get("guard") || p.get("staff") || p.get("gatekeeper") || p.get("q") || p.get("governorate") || p.get("type");
   if (hasUrlFilters) {
@@ -160,21 +170,22 @@ function initSchoolsState(): SchoolsPersistedState {
       schoolUserFilter: staff === "no-staff" || staff === "has-staff" ? staff : "all",
       gatekeeperFilter: gatekeeper === "no-gatekeeper" || gatekeeper === "has-gatekeeper" ? gatekeeper : "all",
       governorateFilter: displayGovernorate(p.get("governorate")),
-      typeFilter: type === "بنين" || type === "بنات" || type === "مختلط" ? type : "",
+      typeFilter: scope === "schools" && (type === "بنين" || type === "بنات") ? type : "",
     };
   }
   try {
-    const raw = sessionStorage.getItem(SCHOOLS_STORAGE_KEY);
+    const raw = sessionStorage.getItem(schoolsStorageKey(scope));
     if (raw) {
       const stored = JSON.parse(raw) as SchoolsPersistedState;
       if (stored && typeof stored.guardFilter === "string") {
+        const storedType = scope === "schools" && (stored.typeFilter === "بنين" || stored.typeFilter === "بنات") ? stored.typeFilter : "";
         return {
           search: stored.search ?? "",
           guardFilter: stored.guardFilter,
           schoolUserFilter: stored.schoolUserFilter ?? "all",
           gatekeeperFilter: stored.gatekeeperFilter ?? "all",
           governorateFilter: displayGovernorate(stored.governorateFilter),
-          typeFilter: stored.typeFilter ?? "",
+          typeFilter: storedType,
         };
       }
     }
@@ -580,10 +591,14 @@ const SCHOOL_TYPES: School["type"][] = ["بنين", "بنات", "مختلط"];
 
 function SchoolFormModal({
   initial,
+  defaultType = "بنين",
+  entityLabel = "مدرسة",
   onSave,
   onClose,
 }: {
   initial?: School;
+  defaultType?: School["type"];
+  entityLabel?: string;
   onSave: (data: Omit<School, "id" | "isDemo">) => void;
   onClose: () => void;
 }) {
@@ -591,7 +606,7 @@ function SchoolFormModal({
   const [name, setName] = useState(initial?.name ?? "");
   const [governorate, setGovernorate] = useState(initial?.governorate ?? "");
   const [level, setLevel] = useState(initial?.level ?? "");
-  const [type, setType] = useState<School["type"]>(initial?.type ?? "بنين");
+  const [type, setType] = useState<School["type"]>(initial?.type ?? defaultType);
   const [principalName, setPrincipalName] = useState(initial?.principalName ?? "");
   const [principalNationalId, setPrincipalNationalId] = useState(initial?.principalNationalId ?? "");
   const [principalPhone, setPrincipalPhone] = useState(initial?.principalPhone ?? "");
@@ -599,7 +614,7 @@ function SchoolFormModal({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) { setError("اسم المدرسة مطلوب"); return; }
+    if (!name.trim()) { setError(`اسم ${entityLabel} مطلوب`); return; }
     setError("");
     onSave({ name: name.trim(), governorate: governorate.trim(), level: level.trim(), type, principalName: principalName.trim(), principalNationalId: principalNationalId.trim(), principalPhone: principalPhone.trim() });
   }
@@ -608,7 +623,7 @@ function SchoolFormModal({
 
   return (
     <ModalShell
-      title={isEdit ? "تعديل بيانات المدرسة" : "إضافة مدرسة جديدة"}
+      title={isEdit ? `تعديل بيانات ${entityLabel}` : `إضافة ${entityLabel} جديدة`}
       subtitle={isEdit ? initial?.name : undefined}
       icon={<SchoolIcon className="w-4.5 h-4.5" />}
       onClose={onClose}
@@ -616,11 +631,11 @@ function SchoolFormModal({
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* School fields */}
         <div className="bg-muted/30 rounded-xl p-4 space-y-3">
-          <p className="text-xs font-bold text-primary uppercase tracking-wide">بيانات المدرسة</p>
+          <p className="text-xs font-bold text-primary uppercase tracking-wide">بيانات {entityLabel}</p>
           <div>
-            <FieldLabel required>اسم المدرسة</FieldLabel>
+            <FieldLabel required>اسم {entityLabel}</FieldLabel>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)}
-              placeholder="أدخل اسم المدرسة" className={inputCls} />
+              placeholder={`أدخل اسم ${entityLabel}`} className={inputCls} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -694,12 +709,18 @@ type MergeModal = { target: School; source: School };
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-export default function Schools() {
+export function Administrations() {
+  return <Schools scope="administrations" />;
+}
+
+export default function Schools({ scope = "schools" }: { scope?: SchoolsScope }) {
   const { schools, guards, gatekeepers, needs, addSchool, updateSchool, deleteSchool, mergeSchools } = useStore();
   const { currentUser, isAdmin } = useUsers();
   const [, navigate] = useLocation();
+  const isAdministrationsPage = scope === "administrations";
+  const pagePath = isAdministrationsPage ? "/administrations" : "/schools";
 
-  const initialState = useMemo(initSchoolsState, []);
+  const initialState = useMemo(() => initSchoolsState(scope), [scope]);
   const [search, setSearch] = useState(initialState.search);
   const [guardFilter, setGuardFilter] = useState<GuardFilter>(initialState.guardFilter);
   const [schoolUserFilter, setSchoolUserFilter] = useState<SchoolUserFilter>(initialState.schoolUserFilter);
@@ -710,17 +731,17 @@ export default function Schools() {
 
   useEffect(() => {
     const state: SchoolsPersistedState = { search, guardFilter, schoolUserFilter, gatekeeperFilter, governorateFilter, typeFilter };
-    try { sessionStorage.setItem(SCHOOLS_STORAGE_KEY, JSON.stringify(state)); } catch {}
+    try { sessionStorage.setItem(schoolsStorageKey(scope), JSON.stringify(state)); } catch {}
     const p = new URLSearchParams();
     if (search) p.set("q", search);
     if (guardFilter !== "all") p.set("guard", guardFilter);
     if (schoolUserFilter !== "all") p.set("staff", schoolUserFilter);
     if (gatekeeperFilter !== "all") p.set("gatekeeper", gatekeeperFilter);
     if (governorateFilter) p.set("governorate", governorateFilter);
-    if (typeFilter) p.set("type", typeFilter);
+    if (!isAdministrationsPage && typeFilter) p.set("type", typeFilter);
     const qs = p.toString();
-    navigate("/schools" + (qs ? "?" + qs : ""), { replace: true });
-  }, [gatekeeperFilter, guardFilter, schoolUserFilter, governorateFilter, search, typeFilter, navigate]);
+    navigate(pagePath + (qs ? "?" + qs : ""), { replace: true });
+  }, [gatekeeperFilter, guardFilter, schoolUserFilter, governorateFilter, isAdministrationsPage, pagePath, scope, search, typeFilter, navigate]);
 
   useEffect(() => {
     if (tableScrollRef.current) tableScrollRef.current.scrollTop = 0;
@@ -737,6 +758,11 @@ export default function Schools() {
   const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [unauthorizedMsg, setUnauthorizedMsg] = useState<string | null>(null);
 
+  const scopedSchools = useMemo(
+    () => schools.filter((school) => isAdministrationsPage ? isAdministrationRecord(school) : !isAdministrationRecord(school)),
+    [isAdministrationsPage, schools]
+  );
+
   const guardCountMap = useMemo(() =>
     new Map(
       Array.from(buildMaleGuardsBySchool(guards).entries(), ([schoolId, schoolGuards]) => [
@@ -750,8 +776,8 @@ export default function Schools() {
   const schoolUserCountMap = useMemo(() => {
     const counts = new Map<string, number>();
     const eligibleSchoolIds = new Set(
-      schools
-        .filter((school) => school.type === "بنات" || school.type === "مختلط")
+      scopedSchools
+        .filter((school) => school.type === "بنات")
         .map((school) => school.id)
     );
     guards.forEach((guard) => {
@@ -760,7 +786,7 @@ export default function Schools() {
       counts.set(guard.schoolId, (counts.get(guard.schoolId) ?? 0) + 1);
     });
     return counts;
-  }, [guards, schools]);
+  }, [guards, scopedSchools]);
 
   const gatekeeperCountMap = useMemo(() => {
     const counts = new Map<string, number>();
@@ -787,14 +813,24 @@ export default function Schools() {
     [schoolUserCountMap]
   );
 
+  const scopedGatekeeperCount = useMemo(
+    () => scopedSchools.reduce((total, school) => total + (gatekeeperCountMap.get(school.id) ?? 0), 0),
+    [gatekeeperCountMap, scopedSchools]
+  );
+
+  const scopedGatekeeperSchoolCount = useMemo(
+    () => scopedSchools.filter((school) => gatekeeperCountMap.has(school.id)).length,
+    [gatekeeperCountMap, scopedSchools]
+  );
+
   const activeGatekeeperCount = useMemo(
-    () => Array.from(gatekeeperCountMap.values()).reduce((total, count) => total + count, 0),
-    [gatekeeperCountMap]
+    () => scopedGatekeeperCount,
+    [scopedGatekeeperCount]
   );
 
   const eligibleSchoolUserSchools = useMemo(
-    () => schools.filter((school) => school.type === "بنات" || school.type === "مختلط"),
-    [schools]
+    () => scopedSchools.filter((school) => school.type === "بنات"),
+    [scopedSchools]
   );
 
   const noSchoolUserCount = useMemo(
@@ -803,21 +839,21 @@ export default function Schools() {
   );
 
   const noGuardCount = useMemo(() =>
-    schools.filter((s) => !guardCountMap.has(s.id)).length,
-    [schools, guardCountMap]
+    scopedSchools.filter((s) => !guardCountMap.has(s.id)).length,
+    [scopedSchools, guardCountMap]
   );
 
   const reviewSchoolCount = useMemo(() =>
-    schools.filter(needsSchoolInfoReview).length,
-    [schools]
+    scopedSchools.filter(needsSchoolInfoReview).length,
+    [scopedSchools]
   );
 
   const mergeCandidates = useMemo(() => {
     const candidates = new Map<string, MergeModal>();
-    for (let i = 0; i < schools.length; i++) {
-      for (let j = i + 1; j < schools.length; j++) {
-        const first = schools[i];
-        const second = schools[j];
+    for (let i = 0; i < scopedSchools.length; i++) {
+      for (let j = i + 1; j < scopedSchools.length; j++) {
+        const first = scopedSchools[i];
+        const second = scopedSchools[j];
         if (!canSuggestMerge(first, second)) continue;
         const pair = chooseMergeTarget(first, second, guardCountMap, schoolUserCountMap, gatekeeperCountMap, needs);
         if (!candidates.has(first.id)) candidates.set(first.id, pair);
@@ -825,18 +861,18 @@ export default function Schools() {
       }
     }
     return candidates;
-  }, [gatekeeperCountMap, guardCountMap, needs, schoolUserCountMap, schools]);
+  }, [gatekeeperCountMap, guardCountMap, needs, schoolUserCountMap, scopedSchools]);
 
   const filterOptions = useMemo(() => ({
-    governorates: uniqueGovernorates(schools.map((school) => school.governorate)),
-    types: unique(schools.map((school) => school.type)),
-  }), [schools]);
+    governorates: uniqueGovernorates(scopedSchools.map((school) => school.governorate)),
+    types: unique(scopedSchools.map((school) => school.type)),
+  }), [scopedSchools]);
 
   const filtered = useMemo(() => {
-    return schools.filter((s) => {
+    return scopedSchools.filter((s) => {
       const hasGuard = guardCountMap.has(s.id);
       const hasGatekeeper = gatekeeperCountMap.has(s.id);
-      const canHaveSchoolUsers = s.type === "بنات" || s.type === "مختلط";
+      const canHaveSchoolUsers = s.type === "بنات";
       const hasSchoolUsers = canHaveSchoolUsers && schoolUserCountMap.has(s.id);
       const matchesFilter =
         guardFilter === "all" ||
@@ -882,12 +918,12 @@ export default function Schools() {
       a.governorate.localeCompare(b.governorate, "ar") ||
       a.name.localeCompare(b.name, "ar")
     );
-  }, [schools, guardCountMap, schoolUserCountMap, gatekeeperCountMap, gatekeepersBySchool, gatekeeperFilter, schoolUserFilter, governorateFilter, guardFilter, search, typeFilter]);
+  }, [scopedSchools, guardCountMap, schoolUserCountMap, gatekeeperCountMap, gatekeepersBySchool, gatekeeperFilter, schoolUserFilter, governorateFilter, guardFilter, search, typeFilter]);
 
   const statusOptions = useMemo(() => [
     { value: "no-guard", label: `بدون حارس (${noGuardCount.toLocaleString("ar-SA")})` },
-    { value: "has-guard", label: `مرتبطة (${(schools.length - noGuardCount).toLocaleString("ar-SA")})` },
-  ], [noGuardCount, schools.length]);
+    { value: "has-guard", label: `مرتبطة (${(scopedSchools.length - noGuardCount).toLocaleString("ar-SA")})` },
+  ], [noGuardCount, scopedSchools.length]);
 
   const schoolUserStatusOptions = useMemo(() => [
     { value: "no-staff", label: `بدون حارسات (${noSchoolUserCount.toLocaleString("ar-SA")})` },
@@ -895,9 +931,9 @@ export default function Schools() {
   ], [eligibleSchoolUserSchools.length, noSchoolUserCount]);
 
   const gatekeeperStatusOptions = useMemo(() => [
-    { value: "no-gatekeeper", label: `بدون بوابين (${(schools.length - gatekeeperCountMap.size).toLocaleString("ar-SA")})` },
-    { value: "has-gatekeeper", label: `مرتبطة (${gatekeeperCountMap.size.toLocaleString("ar-SA")})` },
-  ], [gatekeeperCountMap.size, schools.length]);
+    { value: "no-gatekeeper", label: `بدون بوابين (${(scopedSchools.length - scopedGatekeeperSchoolCount).toLocaleString("ar-SA")})` },
+    { value: "has-gatekeeper", label: `مرتبطة (${scopedGatekeeperSchoolCount.toLocaleString("ar-SA")})` },
+  ], [scopedGatekeeperSchoolCount, scopedSchools.length]);
 
   function handleSaveSchool(data: Omit<School, "id" | "isDemo">) {
     if (formModal?.mode === "edit") {
@@ -976,15 +1012,15 @@ export default function Schools() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-xl font-bold text-foreground">إدارة المدارس</h2>
+          <h2 className="text-xl font-bold text-foreground">{isAdministrationsPage ? "إدارة الإدارات" : "إدارة المدارس"}</h2>
           <p className="text-muted-foreground text-sm mt-0.5">
-            إجمالي: {schools.length.toLocaleString("ar-SA")} مدرسة
-            {noGuardCount > 0 && (
+            إجمالي: {scopedSchools.length.toLocaleString("ar-SA")} {isAdministrationsPage ? "إدارة" : "مدرسة"}
+            {!isAdministrationsPage && noGuardCount > 0 && (
               <span className="mr-2 text-orange-600 font-semibold">
                 — {noGuardCount.toLocaleString("ar-SA")} بدون حارس
               </span>
             )}
-            {reviewSchoolCount > 0 && (
+            {!isAdministrationsPage && reviewSchoolCount > 0 && (
               <span className="mr-2 text-amber-700 font-semibold">
                 — {reviewSchoolCount.toLocaleString("ar-SA")} بحاجة لمراجعة البيانات
               </span>
@@ -1003,10 +1039,10 @@ export default function Schools() {
             />
           </div>
           <button
-            onClick={() => exportSchoolsWorkbook(schools, guards, gatekeepers)}
-            disabled={schools.length === 0}
+            onClick={() => exportSchoolsWorkbook(scopedSchools, guards, gatekeepers)}
+            disabled={scopedSchools.length === 0}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-white text-primary border border-primary/30 hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap dark:bg-card"
-            title={`تصدير ${schools.length.toLocaleString("ar-SA")} مدرسة إلى Excel`}
+            title={`تصدير ${scopedSchools.length.toLocaleString("ar-SA")} ${isAdministrationsPage ? "إدارة" : "مدرسة"} إلى Excel`}
           >
             <Download className="w-4 h-4" />
             تصدير Excel
@@ -1016,22 +1052,22 @@ export default function Schools() {
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-primary text-white hover:bg-primary/90 transition-colors whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
-            إضافة مدرسة
+            {isAdministrationsPage ? "إضافة إدارة" : "إضافة مدرسة"}
           </button>
         </div>
       </div>
 
       {/* Stats bar */}
-      {schools.length > 0 && (
+      {!isAdministrationsPage && scopedSchools.length > 0 && (
         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
             {[
-              { label: "إجمالي المدارس", value: schools.length, color: "bg-white border-border text-foreground" },
+              { label: "إجمالي المدارس", value: scopedSchools.length, color: "bg-white border-border text-foreground" },
               { label: "بحاجة لمراجعة البيانات", value: reviewSchoolCount, color: reviewSchoolCount > 0 ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-green-50 border-green-200 text-green-800" },
               { label: "مدارس بدون حارس", value: noGuardCount, color: noGuardCount > 0 ? "bg-orange-50 border-orange-200 text-orange-800" : "bg-green-50 border-green-200 text-green-800" },
-              { label: "مدارس مرتبطة بحارس", value: schools.length - noGuardCount, color: "bg-teal-50 border-teal-200 text-teal-800" },
+              { label: "مدارس مرتبطة بحارس", value: scopedSchools.length - noGuardCount, color: "bg-teal-50 border-teal-200 text-teal-800" },
             { label: "المستخدمات بالمدارس", value: schoolUserCount, color: "bg-pink-50 border-pink-200 text-pink-800" },
             { label: "إجمالي البوابين", value: activeGatekeeperCount, color: "bg-blue-50 border-blue-200 text-blue-800" },
-            { label: "مدارس مرتبطة ببوابين", value: gatekeeperCountMap.size, color: "bg-cyan-50 border-cyan-200 text-cyan-800" },
+            { label: "مدارس مرتبطة ببوابين", value: scopedGatekeeperSchoolCount, color: "bg-cyan-50 border-cyan-200 text-cyan-800" },
           ].map((s) => (
             <div key={s.label} className={`border rounded-xl p-3 text-center ${s.color}`}>
               <p className="text-xl font-bold">{s.value.toLocaleString("ar-SA")}</p>
@@ -1043,7 +1079,7 @@ export default function Schools() {
 
       {/* Table */}
       <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-white shadow-sm dark:bg-card">
-        {schools.length === 0 ? (
+        {scopedSchools.length === 0 ? (
           <div className="py-20 text-center">
             <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
               <SchoolIcon className="w-7 h-7 text-muted-foreground" />
@@ -1051,7 +1087,9 @@ export default function Schools() {
             <p className="text-muted-foreground font-medium">لا توجد بيانات حالياً</p>
             <p className="text-muted-foreground text-sm mt-1">
               يمكنك{" "}
-              <button onClick={() => setFormModal({ mode: "add" })} className="text-primary hover:underline">إضافة مدرسة يدوياً</button>
+              <button onClick={() => setFormModal({ mode: "add" })} className="text-primary hover:underline">
+                {isAdministrationsPage ? "إضافة إدارة يدوياً" : "إضافة مدرسة يدوياً"}
+              </button>
               {" "}أو استيراد بيانات من{" "}
               <a href="/data" className="text-primary hover:underline">إدارة البيانات</a>
             </p>
@@ -1121,7 +1159,7 @@ export default function Schools() {
                 {filtered.map((school) => {
                   const count = guardCountMap.get(school.id) ?? 0;
                   const gatekeeperCount = gatekeeperCountMap.get(school.id) ?? 0;
-                  const canHaveSchoolUsers = school.type === "بنات" || school.type === "مختلط";
+                  const canHaveSchoolUsers = school.type === "بنات";
                   const userCount = canHaveSchoolUsers ? schoolUserCountMap.get(school.id) ?? 0 : 0;
                   const noGuard = count === 0;
                   const needsReview = needsSchoolInfoReview(school);
@@ -1341,6 +1379,8 @@ export default function Schools() {
       {formModal && (
         <SchoolFormModal
           initial={formModal.mode === "edit" ? formModal.school : undefined}
+          defaultType={isAdministrationsPage ? "مختلط" : "بنين"}
+          entityLabel={isAdministrationsPage ? "الإدارة" : "المدرسة"}
           onSave={handleSaveSchool}
           onClose={() => setFormModal(null)}
         />
