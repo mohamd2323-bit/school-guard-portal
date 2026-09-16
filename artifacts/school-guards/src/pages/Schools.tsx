@@ -48,6 +48,24 @@ function googleMapsSchoolUrl(school: School) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 
+function ministerialNumbersForSchool(school: School) {
+  const numbers = new Set<string>();
+  if (school.ministerialNumber?.trim()) numbers.add(school.ministerialNumber.trim());
+  school.ministerialRecords?.forEach((record) => {
+    if (record.ministerialNumber?.trim()) numbers.add(record.ministerialNumber.trim());
+  });
+  return Array.from(numbers);
+}
+
+function needsSchoolInfoReview(school: School) {
+  return ministerialNumbersForSchool(school).length === 0 || school.principalDataSource === "البوابة";
+}
+
+function schoolInfoReviewReason(school: School) {
+  if (school.principalDataSource === "البوابة") return "بيانات البوابة القديمة";
+  return "بدون رقم وزاري";
+}
+
 function normalizeSchoolText(value: string | null | undefined) {
   return (value ?? "")
     .trim()
@@ -789,6 +807,11 @@ export default function Schools() {
     [schools, guardCountMap]
   );
 
+  const reviewSchoolCount = useMemo(() =>
+    schools.filter(needsSchoolInfoReview).length,
+    [schools]
+  );
+
   const mergeCandidates = useMemo(() => {
     const candidates = new Map<string, MergeModal>();
     for (let i = 0; i < schools.length; i++) {
@@ -854,7 +877,11 @@ export default function Schools() {
           gatekeeper.name.includes(q) || gatekeeper.nationalId.includes(q) || gatekeeper.phone.includes(q)
         );
       return matchesFilter && matchesSchoolUserFilter && matchesGatekeeperFilter && matchesGovernorate && matchesType && matchesSearch;
-    });
+    }).sort((a, b) =>
+      Number(!needsSchoolInfoReview(a)) - Number(!needsSchoolInfoReview(b)) ||
+      a.governorate.localeCompare(b.governorate, "ar") ||
+      a.name.localeCompare(b.name, "ar")
+    );
   }, [schools, guardCountMap, schoolUserCountMap, gatekeeperCountMap, gatekeepersBySchool, gatekeeperFilter, schoolUserFilter, governorateFilter, guardFilter, search, typeFilter]);
 
   const statusOptions = useMemo(() => [
@@ -957,6 +984,11 @@ export default function Schools() {
                 — {noGuardCount.toLocaleString("ar-SA")} بدون حارس
               </span>
             )}
+            {reviewSchoolCount > 0 && (
+              <span className="mr-2 text-amber-700 font-semibold">
+                — {reviewSchoolCount.toLocaleString("ar-SA")} بحاجة لمراجعة البيانات
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -992,10 +1024,11 @@ export default function Schools() {
       {/* Stats bar */}
       {schools.length > 0 && (
         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-          {[
-            { label: "إجمالي المدارس", value: schools.length, color: "bg-white border-border text-foreground" },
-            { label: "مدارس بدون حارس", value: noGuardCount, color: noGuardCount > 0 ? "bg-orange-50 border-orange-200 text-orange-800" : "bg-green-50 border-green-200 text-green-800" },
-            { label: "مدارس مرتبطة بحارس", value: schools.length - noGuardCount, color: "bg-teal-50 border-teal-200 text-teal-800" },
+            {[
+              { label: "إجمالي المدارس", value: schools.length, color: "bg-white border-border text-foreground" },
+              { label: "بحاجة لمراجعة البيانات", value: reviewSchoolCount, color: reviewSchoolCount > 0 ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-green-50 border-green-200 text-green-800" },
+              { label: "مدارس بدون حارس", value: noGuardCount, color: noGuardCount > 0 ? "bg-orange-50 border-orange-200 text-orange-800" : "bg-green-50 border-green-200 text-green-800" },
+              { label: "مدارس مرتبطة بحارس", value: schools.length - noGuardCount, color: "bg-teal-50 border-teal-200 text-teal-800" },
             { label: "المستخدمات بالمدارس", value: schoolUserCount, color: "bg-pink-50 border-pink-200 text-pink-800" },
             { label: "إجمالي البوابين", value: activeGatekeeperCount, color: "bg-blue-50 border-blue-200 text-blue-800" },
             { label: "مدارس مرتبطة ببوابين", value: gatekeeperCountMap.size, color: "bg-cyan-50 border-cyan-200 text-cyan-800" },
@@ -1091,16 +1124,37 @@ export default function Schools() {
                   const canHaveSchoolUsers = school.type === "بنات" || school.type === "مختلط";
                   const userCount = canHaveSchoolUsers ? schoolUserCountMap.get(school.id) ?? 0 : 0;
                   const noGuard = count === 0;
+                  const needsReview = needsSchoolInfoReview(school);
                   return (
                     <tr
                       key={school.id}
-                      className={noGuard ? "bg-orange-50/60 text-orange-950 hover:bg-orange-50 dark:bg-orange-950/30 dark:text-orange-100 dark:hover:bg-orange-950/45" : undefined}
+                      className={
+                        needsReview
+                          ? "bg-amber-50/80 text-amber-950 hover:bg-amber-50 dark:bg-amber-950/30 dark:text-amber-100 dark:hover:bg-amber-950/45"
+                          : noGuard
+                            ? "bg-orange-50/60 text-orange-950 hover:bg-orange-50 dark:bg-orange-950/30 dark:text-orange-100 dark:hover:bg-orange-950/45"
+                            : undefined
+                      }
                     >
                       {/* School name */}
                       <td>
-                        <p className={`font-semibold ${noGuard ? "text-orange-950 dark:text-orange-100" : "text-card-foreground"}`}>
-                          {school.name}
-                        </p>
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className={`font-semibold ${needsReview ? "text-amber-950 dark:text-amber-100" : noGuard ? "text-orange-950 dark:text-orange-100" : "text-card-foreground"}`}>
+                              {school.name}
+                            </p>
+                            {needsReview && (
+                              <span className="badge bg-amber-100 text-amber-800 border border-amber-200">
+                                {schoolInfoReviewReason(school)}
+                              </span>
+                            )}
+                          </div>
+                          {needsReview && school.principalName && (
+                            <p className="text-xs font-medium text-amber-700 dark:text-amber-200">
+                              المدير/ة: {school.principalName}
+                            </p>
+                          )}
+                        </div>
                       </td>
                       <td>{school.governorate}</td>
                       <td>{school.level}</td>
