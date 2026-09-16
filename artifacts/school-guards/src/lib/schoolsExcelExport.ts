@@ -27,6 +27,7 @@ const GUARD_HEADERS = [
 const SCHOOL_HEADERS = [
   "حالة التحديث",
   "سبب المراجعة",
+  "بيانات المقارنة",
   "المحافظة",
   "اسم المدرسة",
   "المرحلة",
@@ -186,6 +187,10 @@ function schoolReviewReason(school: School) {
   return "لا يوجد رقم وزاري أو سجلات وزارية؛ يظهر في آخر البيان للمراجعة";
 }
 
+function schoolReviewReference(school: School) {
+  return [school.name, school.principalName].filter(Boolean).join(" | ");
+}
+
 function buildSchoolRows(schools: School[], guards: Guard[], gatekeepers: Gatekeeper[] = []) {
   const guardsBySchool = buildMaleGuardsBySchool(guards);
   const gatekeepersBySchool = new Map<string, number>();
@@ -195,7 +200,7 @@ function buildSchoolRows(schools: School[], guards: Guard[], gatekeepers: Gateke
   });
 
   const sortedSchools = [...schools].sort((a, b) =>
-    Number(!hasLatestSchoolInfo(a)) - Number(!hasLatestSchoolInfo(b)) ||
+    Number(hasLatestSchoolInfo(a)) - Number(hasLatestSchoolInfo(b)) ||
     a.governorate.localeCompare(b.governorate, "ar") ||
     a.name.localeCompare(b.name, "ar")
   );
@@ -206,6 +211,7 @@ function buildSchoolRows(schools: School[], guards: Guard[], gatekeepers: Gateke
     return [
       hasLatestSchoolInfo(school) ? "محدث" : "بحاجة للمراجعة",
       schoolReviewReason(school),
+      schoolReviewReference(school),
       valueFor(schoolRecord, "governorate"),
       valueFor(schoolRecord, "name"),
       valueFor(schoolRecord, "level"),

@@ -360,6 +360,10 @@ function schoolReviewReason(school: School) {
   return "لا يوجد رقم وزاري أو سجلات وزارية؛ يظهر في آخر البيان للمراجعة";
 }
 
+function schoolReviewReference(school: School) {
+  return [school.name, school.principalName].filter(Boolean).join(" | ");
+}
+
 // ─── Drop zone sub-component ─────────────────────────────────────────────────
 
 function DropZone({
@@ -581,13 +585,14 @@ export default function DataManagement() {
     if (exportSheets.schools) {
       const schoolsData = [...schools]
         .sort((a, b) =>
-          Number(!hasLatestSchoolInfo(a)) - Number(!hasLatestSchoolInfo(b)) ||
+          Number(hasLatestSchoolInfo(a)) - Number(hasLatestSchoolInfo(b)) ||
           a.governorate.localeCompare(b.governorate, "ar") ||
           a.name.localeCompare(b.name, "ar")
         )
         .map((s) => ({
         "حالة التحديث": hasLatestSchoolInfo(s) ? "محدث" : "بحاجة للمراجعة",
         "سبب المراجعة": schoolReviewReason(s),
+        "بيانات المقارنة": schoolReviewReference(s),
         "معرف المدرسة": s.id,
         "اسم المدرسة": s.name,
         "الرقم الوزاري الرئيسي": s.ministerialNumber ?? "",
